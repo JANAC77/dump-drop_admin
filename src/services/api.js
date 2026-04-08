@@ -45,13 +45,16 @@ export const adminAPI = {
   // Users
   getUsers: (page = 1, limit = 10, search = '') => 
     api.get('/users', { params: { page, limit, search } }),
-  getUserDetails: (userId) => api.get(`/users/${userId}`),
+  getUserDetails: (userId) => {
+  console.log('Calling getUserDetails with ID:', userId);
+  return api.get(`/users/${userId}`);
+  },
   updateUserStatus: (userId, status, reason = '') => 
     api.put(`/users/${userId}/status`, { status, reason }),
   
   // Drivers
   getDrivers: () => api.get('/drivers'),
-  getDriverDetails: (driverId) => api.get(`/drivers/${driverId}`),
+  getDriverById: (driverId) => api.get(`/drivers/${driverId}`),
   verifyDriver: (driverId, status, reason = '') => 
     api.put(`/drivers/${driverId}/verify`, { status, reason }),
   
