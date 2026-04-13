@@ -96,7 +96,7 @@ function Bookings() {
                   </div>
                   {getStatusBadge(booking.status)}
                 </div>
-                
+
                 <div className="space-y-3 mb-4">
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-gray-400" />
@@ -118,7 +118,7 @@ function Bookings() {
                     <p className="text-lg font-bold text-gray-900">₹{booking.amount}</p>
                   </div>
                 </div>
-                
+
                 <button className="w-full py-2 text-blue-600 hover:bg-blue-50 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2">
                   <Eye className="w-4 h-4" />
                   View Details

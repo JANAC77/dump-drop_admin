@@ -23,7 +23,7 @@ function CustomerProfile() {
     try {
       const response = await adminAPI.getUserDetails(id);
       console.log('Customer API Response:', response);
-      
+
       // Handle different response structures
       let customerData = null;
       if (response.data?.data) {
@@ -33,7 +33,7 @@ function CustomerProfile() {
       } else if (response.data) {
         customerData = response.data;
       }
-      
+
       console.log('Processed customer data:', customerData);
       setCustomer(customerData);
       setEditForm(customerData || {});
@@ -171,7 +171,7 @@ function CustomerProfile() {
             </div>
             <div className="text-center sm:text-left">
               {editing ? (
-                <input type="text" value={editForm.name || ''} onChange={(e) => setEditForm({...editForm, name: e.target.value})} className="text-2xl font-bold text-white bg-white/20 rounded-lg px-3 py-1 mb-2" />
+                <input type="text" value={editForm.name || ''} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="text-2xl font-bold text-white bg-white/20 rounded-lg px-3 py-1 mb-2" />
               ) : (
                 <h2 className="text-2xl font-bold text-white">{getName()}</h2>
               )}
@@ -215,7 +215,7 @@ function CustomerProfile() {
               <div>
                 <p className="text-xs text-gray-500">Phone Number</p>
                 {editing ? (
-                  <input type="tel" value={editForm.phone || ''} onChange={(e) => setEditForm({...editForm, phone: e.target.value})} className="text-sm text-gray-900 border rounded-lg px-2 py-1" />
+                  <input type="tel" value={editForm.phone || ''} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} className="text-sm text-gray-900 border rounded-lg px-2 py-1" />
                 ) : (
                   <p className="text-sm text-gray-900">{getPhone()}</p>
                 )}
@@ -226,7 +226,7 @@ function CustomerProfile() {
               <div>
                 <p className="text-xs text-gray-500">Email Address</p>
                 {editing ? (
-                  <input type="email" value={editForm.email || ''} onChange={(e) => setEditForm({...editForm, email: e.target.value})} className="text-sm text-gray-900 border rounded-lg px-2 py-1" />
+                  <input type="email" value={editForm.email || ''} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className="text-sm text-gray-900 border rounded-lg px-2 py-1" />
                 ) : (
                   <p className="text-sm text-gray-900">{getEmail()}</p>
                 )}
@@ -244,7 +244,7 @@ function CustomerProfile() {
               <div>
                 <p className="text-xs text-gray-500">Default Address</p>
                 {editing ? (
-                  <input type="text" value={editForm.address || ''} onChange={(e) => setEditForm({...editForm, address: e.target.value})} className="text-sm text-gray-900 border rounded-lg px-2 py-1" />
+                  <input type="text" value={editForm.address || ''} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} className="text-sm text-gray-900 border rounded-lg px-2 py-1" />
                 ) : (
                   <p className="text-sm text-gray-900">{getAddress()}</p>
                 )}
@@ -276,9 +276,8 @@ function CustomerProfile() {
                       <td className="px-4 py-2 text-sm text-gray-500">{new Date(ride.date).toLocaleDateString()}</td>
                       <td className="px-4 py-2 text-sm font-medium text-gray-900">₹{ride.fare}</td>
                       <td className="px-4 py-2">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                          ride.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                        }`}>
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${ride.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                          }`}>
                           {ride.status}
                         </span>
                       </td>

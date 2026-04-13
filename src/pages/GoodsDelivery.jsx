@@ -17,11 +17,11 @@ function GoodsDelivery() {
     setLoading(true);
     try {
       const response = await adminAPI.getRides(1, 50, { type: 'goods', status: statusFilter !== 'all' ? statusFilter : undefined });
-      
+
       // Log the response to see the actual structure
       console.log('Goods Delivery API Response:', response);
       console.log('Response data:', response.data);
-      
+
       // Handle different response structures
       let ridesData = [];
       if (response.data?.rides) {
@@ -33,7 +33,7 @@ function GoodsDelivery() {
       } else if (response.data?.data && Array.isArray(response.data.data)) {
         ridesData = response.data.data;
       }
-      
+
       setDeliveries(ridesData);
     } catch (error) {
       console.error('Error fetching deliveries:', error);
@@ -47,7 +47,6 @@ function GoodsDelivery() {
     const statusConfig = {
       pending: { color: 'bg-yellow-100 text-yellow-700', icon: Clock, label: 'Pending' },
       searching: { color: 'bg-yellow-100 text-yellow-700', icon: Clock, label: 'Searching' },
-      accepted: { color: 'bg-blue-100 text-blue-700', icon: Package, label: 'Accepted' },
       ongoing: { color: 'bg-purple-100 text-purple-700', icon: Truck, label: 'In Transit' },
       completed: { color: 'bg-green-100 text-green-700', icon: CheckCircle, label: 'Delivered' },
       cancelled: { color: 'bg-red-100 text-red-700', icon: XCircle, label: 'Cancelled' },
@@ -114,7 +113,7 @@ function GoodsDelivery() {
 
   const stats = {
     pending: deliveries.filter(d => ['pending', 'searching'].includes(d.status?.toLowerCase())).length,
-    inTransit: deliveries.filter(d => ['accepted', 'ongoing'].includes(d.status?.toLowerCase())).length,
+    inTransit: deliveries.filter(d => ['ongoing'].includes(d.status?.toLowerCase())).length,
     delivered: deliveries.filter(d => d.status?.toLowerCase() === 'completed').length,
     cancelled: deliveries.filter(d => d.status?.toLowerCase() === 'cancelled').length,
   };
@@ -152,7 +151,6 @@ function GoodsDelivery() {
           >
             <option value="all">All Status</option>
             <option value="pending">Pending</option>
-            <option value="accepted">Accepted</option>
             <option value="ongoing">In Transit</option>
             <option value="completed">Delivered</option>
             <option value="cancelled">Cancelled</option>
@@ -190,13 +188,12 @@ function GoodsDelivery() {
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Package</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredDeliveries.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-5 py-10 text-center text-gray-500">
+                  <td colSpan="6" className="px-5 py-10 text-center text-gray-500">
                     {loading ? 'Loading...' : 'No deliveries found'}
                   </td>
                 </tr>
@@ -225,14 +222,6 @@ function GoodsDelivery() {
                     </td>
                     <td className="px-5 py-3 text-sm font-semibold text-gray-900">₹{getFare(delivery)}</td>
                     <td className="px-5 py-3">{getStatusBadge(delivery.status)}</td>
-                    <td className="px-5 py-3">
-                      <button 
-                        onClick={() => window.location.href = `/rides/${delivery._id}`}
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    </td>
                   </tr>
                 ))
               )}

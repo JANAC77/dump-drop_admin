@@ -20,10 +20,10 @@ function CabRides() {
     setLoading(true);
     try {
       const response = await adminAPI.getRides(1, 50, { type: 'cab', status: statusFilter !== 'all' ? statusFilter : undefined });
-      
+
       // Log the response to debug
       console.log('Cab Rides API Response:', response);
-      
+
       // Handle different response structures
       let ridesData = [];
       if (response.data?.rides) {
@@ -35,7 +35,7 @@ function CabRides() {
       } else if (response.data?.data && Array.isArray(response.data.data)) {
         ridesData = response.data.data;
       }
-      
+
       console.log('Processed rides data:', ridesData);
       setRides(ridesData);
     } catch (error) {
@@ -201,13 +201,12 @@ function CabRides() {
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Driver</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredRides.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-5 py-10 text-center text-gray-500">
+                  <td colSpan="7" className="px-5 py-10 text-center text-gray-500">
                     {loading ? 'Loading...' : 'No rides found'}
                   </td>
                 </tr>
@@ -247,21 +246,6 @@ function CabRides() {
                     </td>
                     <td className="px-5 py-3 text-sm font-semibold text-gray-900">₹{getFare(ride)}</td>
                     <td className="px-5 py-3">{getStatusBadge(ride.status)}</td>
-                    <td className="px-5 py-3">
-                      <div className="flex gap-2">
-                        {['pending', 'searching'].includes(ride.status?.toLowerCase()) && (
-                          <button
-                            onClick={() => {
-                              setSelectedRide(ride);
-                              setShowCancelModal(true);
-                            }}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
                   </tr>
                 ))
               )}

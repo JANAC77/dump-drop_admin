@@ -20,7 +20,7 @@ function AllRides() {
     setLoading(true);
     try {
       const response = await adminAPI.getRides(1, 100, { type: typeFilter !== 'all' ? typeFilter : undefined });
-      
+
       let ridesData = [];
       if (response.data?.rides) {
         ridesData = response.data.rides;
@@ -31,7 +31,7 @@ function AllRides() {
       } else if (response.data?.data && Array.isArray(response.data.data)) {
         ridesData = response.data.data;
       }
-      
+
       setRides(ridesData);
     } catch (error) {
       console.error('Error fetching rides:', error);
@@ -44,7 +44,7 @@ function AllRides() {
   // Filter rides by date
   const filterByDate = (ride) => {
     if (dateFilter === 'all') return true;
-    
+
     const rideDate = new Date(ride.date || ride.createdAt || ride.departureDate);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -52,8 +52,8 @@ function AllRides() {
     weekStart.setDate(today.getDate() - today.getDay());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const yearStart = new Date(now.getFullYear(), 0, 1);
-    
-    switch(dateFilter) {
+
+    switch (dateFilter) {
       case 'today':
         return rideDate.toDateString() === today.toDateString();
       case 'week':
@@ -118,13 +118,13 @@ function AllRides() {
   // Apply all filters
   const filteredRides = rides.filter(ride => {
     const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = 
+    const matchesSearch =
       getCustomerName(ride).toLowerCase().includes(searchLower) ||
       getFromLocation(ride).toLowerCase().includes(searchLower) ||
       getToLocation(ride).toLowerCase().includes(searchLower);
-    
+
     const matchesDate = filterByDate(ride);
-    
+
     return matchesSearch && matchesDate;
   });
 
@@ -170,7 +170,7 @@ function AllRides() {
           <p className="text-sm text-gray-500 mt-1">View all rides across the platform</p>
         </div>
         {(searchTerm || typeFilter !== 'all' || dateFilter !== 'all') && (
-          <button 
+          <button
             onClick={clearFilters}
             className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition flex items-center gap-2"
           >

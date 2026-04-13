@@ -28,10 +28,10 @@ function Revenue() {
         adminAPI.getRevenueData(period),
         adminAPI.getDashboardStats()
       ]);
-      
+
       console.log('Revenue API Response:', revenueRes);
       console.log('Stats API Response:', statsRes);
-      
+
       // Handle different response structures for revenue data
       let revenueArray = [];
       if (revenueRes.data?.data && Array.isArray(revenueRes.data.data)) {
@@ -41,10 +41,10 @@ function Revenue() {
       } else if (revenueRes.data?.revenueData && Array.isArray(revenueRes.data.revenueData)) {
         revenueArray = revenueRes.data.revenueData;
       }
-      
+
       console.log('Processed revenue data:', revenueArray);
       setRevenueData(revenueArray);
-      
+
       // Handle stats response structure
       const statsData = statsRes.data?.data || statsRes.data || {};
       setStats({
@@ -95,9 +95,9 @@ function Revenue() {
           <p className="text-sm text-gray-500 mt-1">Track platform revenue and earnings</p>
         </div>
         <div className="flex gap-3">
-          <select 
-            value={period} 
-            onChange={(e) => setPeriod(e.target.value)} 
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="week">This Week</option>
@@ -146,8 +146,8 @@ function Revenue() {
             <AreaChart data={displayData}>
               <defs>
                 <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -163,14 +163,14 @@ function Revenue() {
           <h3 className="text-base font-semibold text-gray-800 mb-4">Revenue by Service</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
-              <Pie 
-                data={pieData} 
-                cx="50%" 
-                cy="50%" 
-                innerRadius={60} 
-                outerRadius={100} 
-                paddingAngle={5} 
-                dataKey="value" 
+              <Pie
+                data={pieData}
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={100}
+                paddingAngle={5}
+                dataKey="value"
                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
               >
                 {pieData.map((entry, index) => (<Cell key={index} fill={entry.color} />))}

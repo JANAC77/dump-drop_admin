@@ -37,52 +37,93 @@ api.interceptors.response.use(
 export const adminAPI = {
   // Auth
   adminLogin: (email, password) => api.post('/login', { email, password }),
-  
+
   // Dashboard
   getDashboardStats: () => api.get('/dashboard/stats'),
   getRevenueData: (period) => api.get(`/dashboard/revenue?period=${period}`),
-  
+
   // Users
-  getUsers: (page = 1, limit = 10, search = '') => 
+  getUsers: (page = 1, limit = 10, search = '') =>
     api.get('/users', { params: { page, limit, search } }),
   getUserDetails: (userId) => {
-  console.log('Calling getUserDetails with ID:', userId);
-  return api.get(`/users/${userId}`);
+    console.log('Calling getUserDetails with ID:', userId);
+    return api.get(`/users/${userId}`);
   },
-  updateUserStatus: (userId, status, reason = '') => 
+  updateUserStatus: (userId, status, reason = '') =>
     api.put(`/users/${userId}/status`, { status, reason }),
-  
+
   // Drivers
   getDrivers: () => api.get('/drivers'),
   getDriverById: (driverId) => api.get(`/drivers/${driverId}`),
-  verifyDriver: (driverId, status, reason = '') => 
+  verifyDriver: (driverId, status, reason = '') =>
     api.put(`/drivers/${driverId}/verify`, { status, reason }),
-  
+
   // Rides
-  getRides: (page = 1, limit = 10, filters = {}) => 
+  getRides: (page = 1, limit = 10, filters = {}) =>
     api.get('/rides', { params: { page, limit, ...filters } }),
   cancelRide: (rideId, reason) => api.put(`/rides/${rideId}/cancel`, { reason }),
-  
+
   // Commission
   getCommissionSettings: () => api.get('/commission'),
   updateCommissionSettings: (settings) => api.put('/commission', settings),
-  
+
   // Settings
   getSettings: () => api.get('/settings'),
   updateSettings: (settings) => api.put('/settings', settings),
-  
+
   // Vehicles (mock for now - implement backend endpoints as needed)
   getVehicles: () => Promise.resolve({ data: { vehicles: [] } }),
   addVehicle: (data) => Promise.resolve({ data: { success: true } }),
   updateVehicle: (id, data) => Promise.resolve({ data: { success: true } }),
   deleteVehicle: (id) => Promise.resolve({ data: { success: true } }),
-  
+
   // Payouts (mock)
   getPayouts: () => Promise.resolve({ data: { payouts: [] } }),
   processPayout: (id) => Promise.resolve({ data: { success: true } }),
-  
+
   // Reports (mock)
   generateReport: (type, start, end) => Promise.resolve({ data: {} }),
+  // Add these to your adminAPI object in api.js
+  // Driver Verification - FIXED
+  getPendingVerifications: () => api.get('/verifications/pending'),
+  getVerificationDetails: (driverId) => api.get(`/verifications/${driverId}`),
+  processVerification: (driverId, action, data) => {
+    // Ensure driverId is a string, not an object
+    const id = typeof driverId === 'string' ? driverId : (driverId._id || driverId.userId);
+    console.log(`Sending request to: /verifications/${id}/${action}`);
+    return api.post(`/verifications/${id}/${action}`, data);
+  },
+  getNotifications: (filters = {}) => {
+    const params = new URLSearchParams(filters).toString();
+    return api.get(`/notifications${params ? `?${params}` : ''}`);
+  },
+  getNotificationStats: () => api.get('/notifications/stats'),
+  markNotificationAsRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllNotificationsAsRead: () => api.put('/notifications/read-all'),
+  deleteNotification: (id) => api.delete(`/notifications/${id}`),
+  sendNotification: (data) => api.post('/notifications/send', data),
+  // Payments
+  getPayments: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/payments${queryString ? `?${queryString}` : ''}`);
+  },
+  getPaymentById: (id) => api.get(`/payments/${id}`),
+  updatePaymentStatus: (id, data) => api.put(`/payments/${id}/status`, data),
+
+  // Transactions
+  getTransactions: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/transactions${queryString ? `?${queryString}` : ''}`);
+  },
+  // Payouts
+  getPayouts: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/payouts${queryString ? `?${queryString}` : ''}`);
+  },
+  getPayoutSummary: () => api.get('/payouts/summary'),
+  getDriverWallet: (driverId) => api.get(`/payouts/drivers/${driverId}/wallet`),
+  processPayout: (id) => api.put(`/payouts/${id}/process`),
+  createPayout: (data) => api.post('/payouts/create', data),
 };
 
 export default api;

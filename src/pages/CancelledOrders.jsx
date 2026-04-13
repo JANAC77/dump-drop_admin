@@ -86,7 +86,7 @@ function CancelledOrders() {
                   </div>
                   <span className="text-xs text-gray-500">{order.type === 'cab' ? 'Cab Ride' : 'Goods Delivery'}</span>
                 </div>
-                
+
                 <div className="space-y-3 mb-4">
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-gray-400" />
@@ -108,7 +108,7 @@ function CancelledOrders() {
                     <p className="text-lg font-bold text-gray-900">₹{order.fare}</p>
                   </div>
                 </div>
-                
+
                 {order.cancelReason && (
                   <div className="bg-red-50 rounded-lg p-3 mb-4">
                     <p className="text-xs text-red-600 font-medium mb-1">Cancellation Reason:</p>

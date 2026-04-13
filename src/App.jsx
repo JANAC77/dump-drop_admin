@@ -28,6 +28,8 @@ import VehicleRates from './pages/VehicleRates';
 import Reports from './pages/Reports';
 import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
+import Payments from './pages/Payments';
+
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -55,7 +57,7 @@ function App() {
   const ProtectedRoute = ({ children }) => {
     if (loading) {
       return (
-        <div className="flex items-center justify-center h-screen">
+        <div className="flex items-center justify-center h-screen bg-gray-50">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       );
@@ -66,14 +68,14 @@ function App() {
   const AdminLayout = ({ children }) => (
     <div className="min-h-screen bg-gray-50">
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <div className="lg:pl-72">
-        <Header 
-          sidebarOpen={sidebarOpen} 
-          setSidebarOpen={setSidebarOpen} 
-          adminUser={adminUser} 
-          onLogout={handleLogout} 
+      <div className="lg:pl-64">
+        <Header
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          adminUser={adminUser}
+          onLogout={handleLogout}
         />
-        <main className="p-4 sm:p-6 lg:p-8">
+        <main className="p-6">
           {children}
         </main>
       </div>
@@ -82,231 +84,264 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            duration: 4000,
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
       <Routes>
-        <Route 
-          path="/login" 
-          element={<Login setIsAuthenticated={setIsAuthenticated} setAdminUser={setAdminUser} />} 
+        <Route
+          path="/login"
+          element={<Login setIsAuthenticated={setIsAuthenticated} setAdminUser={setAdminUser} />}
         />
-        
-        <Route 
-          path="/" 
+
+        <Route
+          path="/"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <Dashboard />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/users" 
+
+        <Route
+          path="/users"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <Users />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/users/:id" 
+
+        <Route
+          path="/users/:id"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <CustomerProfile />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/drivers" 
+
+        <Route
+          path="/drivers"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <Drivers />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/drivers/:id" 
+
+        <Route
+          path="/drivers/:id"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <DriverProfile />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/driver-verification" 
+
+        <Route
+          path="/driver-verification"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <DriverVerification />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/cab-rides" 
+
+        <Route
+          path="/cab-rides"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <CabRides />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/goods-delivery" 
+
+        <Route
+          path="/goods-delivery"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <GoodsDelivery />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/all-rides" 
+
+        <Route
+          path="/all-rides"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <AllRides />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/bookings" 
+
+        <Route
+          path="/bookings"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <Bookings />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/cancellation-requests" 
+
+        <Route
+          path="/cancellation-requests"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <CancellationRequests />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/cancelled-orders" 
+
+        <Route
+          path="/cancelled-orders"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <CancelledOrders />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/commission-settings" 
+
+        <Route
+          path="/commission-settings"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <CommissionSettings />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/payouts" 
+
+        <Route
+          path="/payouts"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <Payouts />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/revenue" 
+
+        <Route
+          path="/revenue"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <Revenue />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/vehicles" 
+
+        <Route
+          path="/vehicles"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <Vehicles />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/vehicle-rates" 
+
+        <Route
+          path="/vehicle-rates"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <VehicleRates />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/reports" 
+
+        <Route
+          path="/reports"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <Reports />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/notifications" 
+
+        <Route
+          path="/notifications"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <Notifications />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/settings" 
+
+        <Route
+          path="/settings"
           element={
             <ProtectedRoute>
               <AdminLayout>
                 <Settings />
               </AdminLayout>
             </ProtectedRoute>
-          } 
+          }
+        />
+        <Route
+          path="/payments"
+          element={
+            <ProtectedRoute>
+              <AdminLayout>
+                <Payments />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
         />
       </Routes>
     </BrowserRouter>
