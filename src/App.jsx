@@ -29,6 +29,9 @@ import Reports from './pages/Reports';
 import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
 import Payments from './pages/Payments';
+import AllBookings from './pages/AllBookings';
+import RevenueReports from './pages/RevenueReports';
+import CancelledRides from './pages/CancelledRides';
 
 
 function App() {
@@ -339,6 +342,41 @@ function App() {
             <ProtectedRoute>
               <AdminLayout>
                 <Payments />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        // Add these routes
+        <Route
+          path="/all-bookings"
+          element={
+            <ProtectedRoute>
+              <AdminLayout>
+                <AllBookings />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/revenue-reports"
+          element={
+            <ProtectedRoute>
+              <AdminLayout>
+                <RevenueReports />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+
+
+        <Route
+          path="/cancelled-rides"
+          element={
+            <ProtectedRoute>
+              <AdminLayout>
+                <CancelledRides />
               </AdminLayout>
             </ProtectedRoute>
           }

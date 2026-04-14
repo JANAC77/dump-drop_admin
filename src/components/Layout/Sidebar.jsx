@@ -36,14 +36,15 @@ const menuItems = [
       { path: '/cab-rides', name: 'Cab Rides', icon: Car },
       { path: '/goods-delivery', name: 'Goods Delivery', icon: Package },
       { path: '/all-rides', name: 'All Rides', icon: ClipboardList },
+      { path: '/all-bookings', name: 'All Bookings', icon: Calendar },
     ]
   },
   {
     category: "BOOKING & CANCELLATION",
     items: [
-      { path: '/bookings', name: 'All Bookings', icon: Calendar },
       { path: '/cancellation-requests', name: 'Cancellation Requests', icon: XCircle },
       { path: '/cancelled-orders', name: 'Cancelled Orders', icon: AlertCircle },
+      { path: '/cancelled-rides', name: 'Cancelled Rides', icon: XCircle },
     ]
   },
   {
@@ -54,6 +55,7 @@ const menuItems = [
 
       { path: '/payouts', name: 'Payouts', icon: CreditCard },
       { path: '/revenue', name: 'Revenue Reports', icon: TrendingUp },
+      { path: '/revenue-reports', name: 'Revenue Analytics', icon: TrendingUp },
     ]
   },
   {

@@ -124,6 +124,41 @@ export const adminAPI = {
   getDriverWallet: (driverId) => api.get(`/payouts/drivers/${driverId}/wallet`),
   processPayout: (id) => api.put(`/payouts/${id}/process`),
   createPayout: (data) => api.post('/payouts/create', data),
+
+  // Bookings
+  getBookings: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/bookings${queryString ? `?${queryString}` : ''}`);
+  },
+  exportBookings: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/bookings/export${queryString ? `?${queryString}` : ''}`, {
+      responseType: 'blob'
+    });
+  },
+
+  // Revenue Reports
+  getRevenueReports: (period) => api.get(`/revenue-reports?period=${period}`),
+  exportRevenueReport: (period) => api.get(`/reports/revenue/export?period=${period}`, {
+    responseType: 'blob'
+  }),
+
+  // Cancelled Rides
+  getCancelledRides: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/cancelled-rides${queryString ? `?${queryString}` : ''}`);
+  },
+  exportCancelledRides: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/cancelled-rides/export${queryString ? `?${queryString}` : ''}`, {
+      responseType: 'blob'
+    });
+  },
+
+  // Custom Reports
+  generateReport: (type, startDate, endDate) => {
+    return api.get(`/reports/generate?type=${type}&startDate=${startDate}&endDate=${endDate}`);
+  },
 };
 
 export default api;
