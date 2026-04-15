@@ -30,7 +30,6 @@ function Payments() {
     const [showModal, setShowModal] = useState(false);
     const [stats, setStats] = useState({
         totalRevenue: 0,
-        totalCommission: 0,
         totalPayout: 0,
         pendingCount: 0,
         completedCount: 0,
@@ -93,6 +92,10 @@ function Payments() {
         return new Date(date).toLocaleString();
     };
 
+    const formatCurrency = (amount) => {
+        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount || 0);
+    };
+
     const handleSearch = (e) => {
         setSearchTerm(e.target.value);
         if (e.target.value.length === 0 || e.target.value.length > 2) {
@@ -122,7 +125,7 @@ function Payments() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Payment Management</h1>
-                    <p className="text-sm text-gray-500 mt-1">Track and manage all payments, commissions, and payouts</p>
+                    <p className="text-sm text-gray-500 mt-1">Track and manage all payments and payouts</p>
                 </div>
                 <div className="flex gap-3">
                     <button
@@ -136,25 +139,18 @@ function Payments() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                     <div className="flex items-center gap-2 mb-2">
                         <DollarSign className="w-5 h-5 text-green-600" />
-                        <p className="text-2xl font-bold text-gray-900">₹{stats.totalRevenue.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalRevenue)}</p>
                     </div>
                     <p className="text-xs text-gray-500">Total Revenue</p>
                 </div>
                 <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                     <div className="flex items-center gap-2 mb-2">
-                        <TrendingUp className="w-5 h-5 text-blue-600" />
-                        <p className="text-2xl font-bold text-gray-900">₹{stats.totalCommission.toLocaleString()}</p>
-                    </div>
-                    <p className="text-xs text-gray-500">Total Commission</p>
-                </div>
-                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                    <div className="flex items-center gap-2 mb-2">
                         <CreditCard className="w-5 h-5 text-purple-600" />
-                        <p className="text-2xl font-bold text-gray-900">₹{stats.totalPayout.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalPayout)}</p>
                     </div>
                     <p className="text-xs text-gray-500">Total Payout</p>
                 </div>
@@ -172,13 +168,6 @@ function Payments() {
                     </div>
                     <p className="text-xs text-gray-500">Completed</p>
                 </div>
-                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                    <div className="flex items-center gap-2 mb-2">
-                        <XCircle className="w-5 h-5 text-red-600" />
-                        <p className="text-2xl font-bold text-gray-900">{stats.failedCount}</p>
-                    </div>
-                    <p className="text-xs text-gray-500">Failed</p>
-                </div>
             </div>
 
             {/* Commission Info Banner */}
@@ -188,11 +177,7 @@ function Payments() {
                         <div>
                             <p className="text-sm font-medium text-blue-800">Current Commission Settings</p>
                             <div className="flex flex-wrap gap-4 mt-1 text-xs text-blue-600">
-                                <span>Cab Commission: {commissionSettings.cabCommission}%</span>
-                                <span>Goods Commission: {commissionSettings.goodsCommission}%</span>
-                                <span>GST: {commissionSettings.gstPercentage}%</span>
-                                <span>Driver Cab: {commissionSettings.cabDriverCommission}%</span>
-                                <span>Driver Goods: {commissionSettings.goodsDriverCommission}%</span>
+                                <span>Driver Commission: {commissionSettings.driverCommission}%</span>
                             </div>
                         </div>
                         <a href="/commission-settings" className="text-sm text-blue-600 hover:text-blue-700">Edit Settings →</a>
@@ -272,9 +257,9 @@ function Payments() {
                                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
                                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Driver</th>
-                                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount (₹)</th>
-                                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commission (₹)</th>
-                                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payout (₹)</th>
+                                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commission</th>
+                                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payout</th>
                                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
                                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -313,9 +298,9 @@ function Payments() {
                                                 <p className="text-xs text-gray-500">{payment.driver?.phone || 'N/A'}</p>
                                             </div>
                                         </td>
-                                        <td className="px-5 py-3 text-sm font-semibold text-gray-900">₹{payment.amount}</td>
-                                        <td className="px-5 py-3 text-sm text-red-600">₹{payment.commission}</td>
-                                        <td className="px-5 py-3 text-sm font-semibold text-green-600">₹{payment.payout}</td>
+                                        <td className="px-5 py-3 text-sm font-semibold text-gray-900">{formatCurrency(payment.amount)}</td>
+                                        <td className="px-5 py-3 text-sm font-semibold text-blue-600">{payment.commission}%</td>
+                                        <td className="px-5 py-3 text-sm font-semibold text-green-600">{formatCurrency(payment.payout)}</td>
                                         <td className="px-5 py-3">{getStatusBadge(payment.status)}</td>
                                         <td className="px-5 py-3">
                                             <p className="text-sm font-mono text-gray-600">{payment.transactionId}</p>
@@ -404,20 +389,16 @@ function Payments() {
                                 <div className="space-y-2">
                                     <div className="flex justify-between">
                                         <span className="text-gray-600">Total Amount</span>
-                                        <span className="font-semibold text-gray-900">₹{selectedPayment.amount}</span>
+                                        <span className="font-semibold text-gray-900">{formatCurrency(selectedPayment.amount)}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-600">Platform Commission ({selectedPayment.rideType === 'cab' ? commissionSettings?.cabCommission || 15 : commissionSettings?.goodsCommission || 12}%)</span>
-                                        <span className="text-red-600">-₹{selectedPayment.commission}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600">GST ({commissionSettings?.gstPercentage || 18}%)</span>
-                                        <span className="text-red-600">-₹{selectedPayment.gst}</span>
+                                        <span className="text-gray-600">Commission Rate</span>
+                                        <span className="font-semibold text-blue-600">{selectedPayment.commission}%</span>
                                     </div>
                                     <div className="border-t pt-2 mt-2">
                                         <div className="flex justify-between font-bold">
                                             <span>Driver Payout</span>
-                                            <span className="text-green-600">₹{selectedPayment.payout}</span>
+                                            <span className="text-green-600">{formatCurrency(selectedPayment.payout)}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -436,8 +417,8 @@ function Payments() {
                                         <span>{selectedPayment.rideType === 'cab' ? 'Cab Ride' : 'Goods Delivery'}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-600">Razorpay Order ID</span>
-                                        <span className="font-mono text-sm">{selectedPayment.razorpayOrderId || 'N/A'}</span>
+                                        <span className="text-gray-600">Payment Mode</span>
+                                        <span>{selectedPayment.paymentMode === 'online' ? 'Online' : 'Cash'}</span>
                                     </div>
                                 </div>
                             </div>

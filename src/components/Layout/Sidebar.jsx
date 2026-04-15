@@ -37,6 +37,7 @@ const menuItems = [
       { path: '/goods-delivery', name: 'Goods Delivery', icon: Package },
       { path: '/all-rides', name: 'All Rides', icon: ClipboardList },
       { path: '/all-bookings', name: 'All Bookings', icon: Calendar },
+      { path: '/rentals', name: 'Vehicle Rentals', icon: Calendar },
     ]
   },
   {

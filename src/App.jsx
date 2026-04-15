@@ -32,6 +32,8 @@ import Payments from './pages/Payments';
 import AllBookings from './pages/AllBookings';
 import RevenueReports from './pages/RevenueReports';
 import CancelledRides from './pages/CancelledRides';
+import Rentals from './pages/Rentals';
+
 
 
 function App() {
@@ -377,6 +379,17 @@ function App() {
             <ProtectedRoute>
               <AdminLayout>
                 <CancelledRides />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/rentals"
+          element={
+            <ProtectedRoute>
+              <AdminLayout>
+                <Rentals />
               </AdminLayout>
             </ProtectedRoute>
           }

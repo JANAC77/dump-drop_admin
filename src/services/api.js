@@ -62,11 +62,10 @@ export const adminAPI = {
   getRides: (page = 1, limit = 10, filters = {}) =>
     api.get('/rides', { params: { page, limit, ...filters } }),
   cancelRide: (rideId, reason) => api.put(`/rides/${rideId}/cancel`, { reason }),
-
-  // Commission
-  getCommissionSettings: () => api.get('/commission'),
-  updateCommissionSettings: (settings) => api.put('/commission', settings),
-
+// Commission
+getCommissionSettings: () => api.get('/commission'),
+updateCommissionSettings: (settings) => api.put('/commission', settings),
+getDriverCommission: () => api.get('/commission/driver'),
   // Settings
   getSettings: () => api.get('/settings'),
   updateSettings: (settings) => api.put('/settings', settings),
@@ -159,6 +158,13 @@ export const adminAPI = {
   generateReport: (type, startDate, endDate) => {
     return api.get(`/reports/generate?type=${type}&startDate=${startDate}&endDate=${endDate}`);
   },
+
+  // Add to adminAPI object
+  getRentals: (params) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/rentals${queryString ? `?${queryString}` : ''}`);
+  },
+
 };
 
 export default api;
