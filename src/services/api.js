@@ -159,11 +159,8 @@ getDriverCommission: () => api.get('/commission/driver'),
     return api.get(`/reports/generate?type=${type}&startDate=${startDate}&endDate=${endDate}`);
   },
 
-  // Add to adminAPI object
-  getRentals: (params) => {
-    const queryString = new URLSearchParams(params).toString();
-    return api.get(`/rentals${queryString ? `?${queryString}` : ''}`);
-  },
+// Rentals
+getRentalsList: () => api.get('/rentals-list'),
 
 };
 

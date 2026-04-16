@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Users, Car, Calendar, DollarSign, TrendingUp, TrendingDown,
-  ArrowRight, Download, RefreshCw, Activity, Package,
-  UserCheck, Clock, CheckCircle, XCircle, Award
+  Users, Car, DollarSign, TrendingUp, TrendingDown,
+  Download, RefreshCw, UserCheck
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
+  CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { adminAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import jsPDF from 'jspdf';
 
 function Dashboard() {
   const [stats, setStats] = useState({
@@ -24,7 +24,6 @@ function Dashboard() {
     revenueGrowth: 0
   });
   const [revenueData, setRevenueData] = useState([]);
-  const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('week');
 
@@ -55,20 +54,156 @@ function Dashboard() {
 
       const revenueArray = revenueRes.data?.data || revenueRes.data || [];
       setRevenueData(revenueArray);
-
-      // Mock recent activities
-      setRecentActivities([
-        { id: 1, type: 'user', message: 'New user registered', time: '2 min ago', icon: Users },
-        { id: 2, type: 'ride', message: 'Ride #CAB123 completed', time: '15 min ago', icon: Car },
-        { id: 3, type: 'booking', message: 'New booking request', time: '1 hour ago', icon: Calendar },
-        { id: 4, type: 'driver', message: 'Driver verification approved', time: '2 hours ago', icon: UserCheck },
-      ]);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let yPos = 20;
+
+    // ========== HEADER ==========
+    doc.setFontSize(24);
+    doc.setTextColor(59, 130, 246);
+    doc.text('DASHBOARD REPORT', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
+
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 15;
+
+    // ========== STATISTICS SECTION ==========
+    doc.setFontSize(16);
+    doc.setTextColor(33, 33, 33);
+    doc.text('Statistics Summary', 14, yPos);
+    yPos += 10;
+
+    doc.setFontSize(10);
+    doc.setTextColor(60, 60, 60);
+    
+    // Create two columns for stats
+    const leftStats = [
+      `Total Users: ${stats.totalUsers.toLocaleString()}`,
+      `Total Rides: ${stats.totalRides.toLocaleString()}`,
+      `Total Bookings: ${stats.totalBookings.toLocaleString()}`,
+      `Total Revenue: ₹${stats.totalRevenue.toLocaleString()}`,
+    ];
+
+    const rightStats = [
+      `Pending Drivers: ${stats.pendingDrivers.toLocaleString()}`,
+      `Active Rides: ${stats.activeRides.toLocaleString()}`,
+      `User Growth: ${stats.userGrowth}%`,
+      `Revenue Growth: ${stats.revenueGrowth}%`,
+    ];
+
+    // Left column
+    leftStats.forEach(item => {
+      doc.text(`✓ ${item}`, 20, yPos);
+      yPos += 7;
+    });
+
+    // Reset yPos for right column
+    yPos = 52;
+    // Right column
+    rightStats.forEach(item => {
+      doc.text(`✓ ${item}`, 120, yPos);
+      yPos += 7;
+    });
+
+    yPos = 90;
+
+    // ========== DIVIDER ==========
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, yPos, pageWidth - 14, yPos);
+    yPos += 10;
+
+    // ========== REVENUE OVERVIEW ==========
+    if (revenueData.length > 0) {
+      doc.setFontSize(16);
+      doc.setTextColor(33, 33, 33);
+      doc.text('Revenue Overview', 14, yPos);
+      yPos += 10;
+
+      // Table headers
+      doc.setFontSize(9);
+      doc.setTextColor(255, 255, 255);
+      doc.setFillColor(59, 130, 246);
+      doc.rect(14, yPos - 4, 180, 8, 'F');
+      doc.text('Period', 20, yPos);
+      doc.text('Revenue (₹)', 70, yPos);
+      doc.text('Rides', 130, yPos);
+      yPos += 6;
+
+      doc.setTextColor(60, 60, 60);
+      doc.setFillColor(245, 245, 245);
+      
+      let rowCount = 0;
+      revenueData.forEach((item, index) => {
+        if (item.revenue > 0 || item.rides > 0) {
+          // Alternate row colors
+          if (rowCount % 2 === 0) {
+            doc.setFillColor(255, 255, 255);
+            doc.rect(14, yPos - 3, 180, 6, 'F');
+          } else {
+            doc.setFillColor(245, 245, 245);
+            doc.rect(14, yPos - 3, 180, 6, 'F');
+          }
+          
+          doc.text(item.name || '-', 20, yPos);
+          doc.text(`₹${(item.revenue || 0).toLocaleString()}`, 70, yPos);
+          doc.text(`${item.rides || 0}`, 130, yPos);
+          yPos += 6;
+          rowCount++;
+          
+          // Add new page if needed
+          if (yPos > 270 && index < revenueData.length - 1) {
+            doc.addPage();
+            yPos = 20;
+            
+            // Repeat header on new page
+            doc.setFontSize(16);
+            doc.setTextColor(33, 33, 33);
+            doc.text('Revenue Overview (Continued)', 14, yPos);
+            yPos += 10;
+            
+            doc.setFontSize(9);
+            doc.setTextColor(255, 255, 255);
+            doc.setFillColor(59, 130, 246);
+            doc.rect(14, yPos - 4, 180, 8, 'F');
+            doc.text('Period', 20, yPos);
+            doc.text('Revenue (₹)', 70, yPos);
+            doc.text('Rides', 130, yPos);
+            yPos += 6;
+            doc.setTextColor(60, 60, 60);
+            rowCount = 0;
+          }
+        }
+      });
+      
+      yPos += 10;
+    }
+
+    // ========== FOOTER ==========
+    if (yPos < 280) {
+      yPos = 280;
+    }
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, yPos, pageWidth - 14, yPos);
+    yPos += 5;
+    
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Dump & Drop Admin Dashboard - Page 1 of 1`, pageWidth / 2, yPos, { align: 'center' });
+
+    // Save PDF
+    doc.save(`dashboard_report_${new Date().toISOString().split('T')[0]}.pdf`);
+    toast.success('PDF downloaded successfully');
   };
 
   const statCards = [
@@ -111,9 +246,12 @@ function Dashboard() {
             <RefreshCw className="w-4 h-4" />
             Refresh
           </button>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2">
+          <button 
+            onClick={exportToPDF}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
+          >
             <Download className="w-4 h-4" />
-            Export
+            Export PDF
           </button>
         </div>
       </div>
@@ -178,54 +316,6 @@ function Dashboard() {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
-
-      {/* Recent Activities */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-5 border-b border-gray-100">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-semibold text-gray-800">Recent Activities</h3>
-            <button className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
-              View All <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-        <div className="divide-y divide-gray-100">
-          {recentActivities.map((activity) => (
-            <div key={activity.id} className="flex items-center gap-4 p-4 hover:bg-gray-50 transition">
-              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                <activity.icon className="w-5 h-5 text-gray-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-gray-900">{activity.message}</p>
-                <p className="text-xs text-gray-500">{activity.time}</p>
-              </div>
-              <button className="text-gray-400 hover:text-gray-600">
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <button className="bg-blue-50 text-blue-700 p-4 rounded-xl text-center hover:bg-blue-100 transition">
-          <Users className="w-6 h-6 mx-auto mb-2" />
-          <p className="text-sm font-medium">Manage Users</p>
-        </button>
-        <button className="bg-green-50 text-green-700 p-4 rounded-xl text-center hover:bg-green-100 transition">
-          <Car className="w-6 h-6 mx-auto mb-2" />
-          <p className="text-sm font-medium">View Rides</p>
-        </button>
-        <button className="bg-purple-50 text-purple-700 p-4 rounded-xl text-center hover:bg-purple-100 transition">
-          <UserCheck className="w-6 h-6 mx-auto mb-2" />
-          <p className="text-sm font-medium">Verify Drivers</p>
-        </button>
-        <button className="bg-orange-50 text-orange-700 p-4 rounded-xl text-center hover:bg-orange-100 transition">
-          <DollarSign className="w-6 h-6 mx-auto mb-2" />
-          <p className="text-sm font-medium">Revenue Report</p>
-        </button>
       </div>
     </div>
   );
