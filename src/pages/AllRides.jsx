@@ -1,25 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Eye, Car, Package, MapPin, User, Calendar as CalIcon, DollarSign, Filter, X, Calendar } from 'lucide-react';
+import { Search, Eye, Car, Package, MapPin, User, Calendar as CalIcon, DollarSign, Filter, X, Calendar, Download, RefreshCw } from 'lucide-react';
 import { adminAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import jsPDF from 'jspdf';
+import autoTable from "jspdf-autotable";
 
 function AllRides() {
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('all'); // all, today, week, month, year
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
   const [selectedDate, setSelectedDate] = useState('');
   const [showCalendar, setShowCalendar] = useState(false);
 
   useEffect(() => {
     fetchRides();
-  }, [typeFilter, dateFilter, selectedDate]);
+  }, [typeFilter, statusFilter, dateFilter, selectedDate]);
 
   const fetchRides = async () => {
     setLoading(true);
     try {
-      const response = await adminAPI.getRides(1, 100, { type: typeFilter !== 'all' ? typeFilter : undefined });
+      const response = await adminAPI.getRides(1, 500, { 
+        type: typeFilter !== 'all' ? typeFilter : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined
+      });
 
       let ridesData = [];
       if (response.data?.rides) {
@@ -41,7 +47,88 @@ function AllRides() {
     }
   };
 
-  // Filter rides by date
+  const exportToPDF = () => {
+    const doc = new jsPDF("p", "mm", "a4");
+    const date = new Date().toLocaleString();
+
+    doc.setFillColor(41, 98, 255);
+    doc.rect(0, 0, 210, 22, "F");
+
+    doc.setTextColor(255);
+    doc.setFontSize(16);
+    doc.text("All Rides Report", 105, 11, { align: "center" });
+
+    doc.setFontSize(9);
+    doc.text(`Generated: ${date}`, 105, 17, { align: "center" });
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
+    doc.text("Statistics Summary", 14, 30);
+    
+    const statsData = [
+      ["Total Rides", stats.total],
+      ["Total Revenue", `${stats.totalAmount.toLocaleString()}`],
+      ["Draft", stats.draft],
+      ["Searching", stats.searching],
+      ["Available", stats.available],
+      ["Accepted", stats.accepted],
+      ["Ongoing", stats.ongoing],
+      ["Completed", stats.completed],
+      ["Cancelled", stats.cancelled],
+    ];
+
+    autoTable(doc, {
+      startY: 35,
+      body: statsData,
+      theme: "grid",
+      styles: { fontSize: 9, cellPadding: 3 },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 80 },
+        1: { halign: "right", cellWidth: 80 },
+      },
+    });
+
+    const tableData = filteredRides.map((ride, i) => [
+      i + 1,
+      ride.role === 'cab_ride' ? 'Cab' : 'Goods',
+      ride._id?.slice(-6) || 'N/A',
+      getCustomerName(ride),
+      getCustomerPhone(ride),
+      `${getFromLocation(ride)} -> ${getToLocation(ride)}`,
+      new Date(getRideDate(ride)).toLocaleDateString(),
+      `${getFare(ride)}`,
+      ride.status || 'N/A',
+    ]);
+
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 10,
+      head: [["No", "Type", "Ride ID", "Customer", "Phone", "Route", "Date", "Amount", "Status"]],
+      body: tableData,
+      theme: "striped",
+      styles: { fontSize: 7.5, cellPadding: 2.5, valign: "middle" },
+      headStyles: { fillColor: [41, 98, 255], textColor: 255, halign: "center", fontStyle: "bold" },
+      columnStyles: {
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 15, halign: "center" },
+        2: { cellWidth: 18 },
+        3: { cellWidth: 30 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 40 },
+        6: { cellWidth: 22, halign: "center" },
+        7: { cellWidth: 18, halign: "right" },
+        8: { cellWidth: 18, halign: "center" },
+      },
+      didDrawPage: () => {
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Page ${doc.internal.getNumberOfPages()}`, 200, 290, { align: "right" });
+      },
+    });
+
+    doc.save(`all_rides_report_${new Date().toISOString().split("T")[0]}.pdf`);
+    toast.success("PDF downloaded successfully");
+  };
+
   const filterByDate = (ride) => {
     if (dateFilter === 'all') return true;
 
@@ -81,9 +168,12 @@ function AllRides() {
     return <Package className="w-4 h-4 text-green-600" />;
   };
 
-  // Safe getters
   const getCustomerName = (ride) => {
     return ride.customer?.name || ride.customerName || ride.customerId?.name || 'N/A';
+  };
+
+  const getCustomerPhone = (ride) => {
+    return ride.customer?.phone || ride.customerPhone || ride.customerId?.phone || 'N/A';
   };
 
   const getFromLocation = (ride) => {
@@ -104,10 +194,11 @@ function AllRides() {
 
   const getStatusBadge = (status) => {
     const statusColors = {
-      pending: 'bg-yellow-100 text-yellow-700',
+      draft: 'bg-gray-100 text-gray-700',
       searching: 'bg-yellow-100 text-yellow-700',
-      accepted: 'bg-blue-100 text-blue-700',
-      ongoing: 'bg-blue-100 text-blue-700',
+      available: 'bg-blue-100 text-blue-700',
+      accepted: 'bg-cyan-100 text-cyan-700',
+      ongoing: 'bg-purple-100 text-purple-700',
       completed: 'bg-green-100 text-green-700',
       cancelled: 'bg-red-100 text-red-700',
     };
@@ -115,11 +206,11 @@ function AllRides() {
     return <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${color}`}>{status || 'N/A'}</span>;
   };
 
-  // Apply all filters
   const filteredRides = rides.filter(ride => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
       getCustomerName(ride).toLowerCase().includes(searchLower) ||
+      getCustomerPhone(ride).toLowerCase().includes(searchLower) ||
       getFromLocation(ride).toLowerCase().includes(searchLower) ||
       getToLocation(ride).toLowerCase().includes(searchLower);
 
@@ -128,25 +219,27 @@ function AllRides() {
     return matchesSearch && matchesDate;
   });
 
-  // Clear all filters
   const clearFilters = () => {
     setSearchTerm('');
     setTypeFilter('all');
+    setStatusFilter('all');
     setDateFilter('all');
     setSelectedDate('');
     setShowCalendar(false);
   };
 
-  // Get stats for filtered rides
   const stats = {
     total: filteredRides.length,
     totalAmount: filteredRides.reduce((sum, ride) => sum + getFare(ride), 0),
+    draft: filteredRides.filter(r => r.status === 'draft').length,
+    searching: filteredRides.filter(r => r.status === 'searching').length,
+    available: filteredRides.filter(r => r.status === 'available').length,
+    accepted: filteredRides.filter(r => r.status === 'accepted').length,
+    ongoing: filteredRides.filter(r => r.status === 'ongoing').length,
     completed: filteredRides.filter(r => r.status === 'completed').length,
-    pending: filteredRides.filter(r => r.status === 'pending' || r.status === 'searching').length,
     cancelled: filteredRides.filter(r => r.status === 'cancelled').length,
   };
 
-  // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -169,53 +262,101 @@ function AllRides() {
           <h1 className="text-2xl font-bold text-gray-900">All Rides</h1>
           <p className="text-sm text-gray-500 mt-1">View all rides across the platform</p>
         </div>
-        {(searchTerm || typeFilter !== 'all' || dateFilter !== 'all') && (
+        <div className="flex gap-3">
           <button
-            onClick={clearFilters}
-            className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition flex items-center gap-2"
+            onClick={fetchRides}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition flex items-center gap-2"
           >
-            <X className="w-4 h-4" />
-            Clear Filters
+            <RefreshCw className="w-4 h-4" />
+            Refresh
           </button>
-        )}
+          <button
+            onClick={exportToPDF}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Export PDF
+          </button>
+          {(searchTerm || typeFilter !== 'all' || statusFilter !== 'all' || dateFilter !== 'all') && (
+            <button
+              onClick={clearFilters}
+              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition flex items-center gap-2"
+            >
+              <X className="w-4 h-4" />
+              Clear Filters
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-          <p className="text-sm text-gray-500">Total Rides</p>
+      {/* Status Dashboard Cards - All 7 Status Types */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+        <div className="bg-white rounded-xl p-3 shadow-sm text-center border-l-4 border-blue-500">
+          <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
+          <p className="text-xs text-gray-500">Total</p>
         </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <p className="text-2xl font-bold text-green-600">₹{stats.totalAmount.toLocaleString()}</p>
-          <p className="text-sm text-gray-500">Total Revenue</p>
+        <div className="bg-white rounded-xl p-3 shadow-sm text-center border-l-4 border-gray-500">
+          <p className="text-2xl font-bold text-gray-600">{stats.draft}</p>
+          <p className="text-xs text-gray-500">Draft</p>
         </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm">
+        <div className="bg-white rounded-xl p-3 shadow-sm text-center border-l-4 border-yellow-500">
+          <p className="text-2xl font-bold text-yellow-600">{stats.searching}</p>
+          <p className="text-xs text-gray-500">Searching</p>
+        </div>
+        <div className="bg-white rounded-xl p-3 shadow-sm text-center border-l-4 border-blue-500">
+          <p className="text-2xl font-bold text-blue-600">{stats.available}</p>
+          <p className="text-xs text-gray-500">Available</p>
+        </div>
+        <div className="bg-white rounded-xl p-3 shadow-sm text-center border-l-4 border-cyan-500">
+          <p className="text-2xl font-bold text-cyan-600">{stats.accepted}</p>
+          <p className="text-xs text-gray-500">Accepted</p>
+        </div>
+        <div className="bg-white rounded-xl p-3 shadow-sm text-center border-l-4 border-purple-500">
+          <p className="text-2xl font-bold text-purple-600">{stats.ongoing}</p>
+          <p className="text-xs text-gray-500">Ongoing</p>
+        </div>
+        <div className="bg-white rounded-xl p-3 shadow-sm text-center border-l-4 border-green-500">
           <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
-          <p className="text-sm text-gray-500">Completed</p>
+          <p className="text-xs text-gray-500">Completed</p>
         </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
-          <p className="text-sm text-gray-500">Pending</p>
+      </div>
+
+      {/* Revenue and Cancelled Card */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-gradient-to-r from-green-600 to-teal-500 rounded-xl p-4 text-white">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sm opacity-80">Total Revenue</p>
+              <p className="text-2xl font-bold">₹{stats.totalAmount.toLocaleString()}</p>
+            </div>
+            <DollarSign className="w-10 h-10 opacity-50" />
+          </div>
+        </div>
+        <div className="bg-gradient-to-r from-red-600 to-orange-500 rounded-xl p-4 text-white">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sm opacity-80">Cancelled Rides</p>
+              <p className="text-2xl font-bold">{stats.cancelled}</p>
+            </div>
+            <X className="w-10 h-10 opacity-50" />
+          </div>
         </div>
       </div>
 
       {/* Filters Bar */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <div className="flex flex-wrap gap-4 items-center">
-          {/* Search */}
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by customer or location..."
+              placeholder="Search by customer, phone or location..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          {/* Ride Type Filter */}
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
@@ -226,7 +367,21 @@ function AllRides() {
             <option value="goods">Goods Delivery</option>
           </select>
 
-          {/* Date Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Status</option>
+            <option value="draft">Draft</option>
+            <option value="searching">Searching</option>
+            <option value="available">Available</option>
+            <option value="accepted">Accepted</option>
+            <option value="ongoing">Ongoing</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+
           <div className="relative">
             <select
               value={dateFilter}
@@ -250,7 +405,6 @@ function AllRides() {
             </select>
           </div>
 
-          {/* Calendar Date Picker */}
           {showCalendar && (
             <div className="relative">
               <div className="flex items-center gap-2 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2">
@@ -299,6 +453,7 @@ function AllRides() {
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ride ID</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Route</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
@@ -308,7 +463,7 @@ function AllRides() {
             <tbody className="divide-y divide-gray-100">
               {filteredRides.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-5 py-10 text-center text-gray-500">
+                  <td colSpan="8" className="px-5 py-10 text-center text-gray-500">
                     No rides found
                   </td>
                 </tr>
@@ -320,6 +475,7 @@ function AllRides() {
                       #{ride._id?.slice(-6) || ride.id?.slice(-6) || 'N/A'}
                     </td>
                     <td className="px-5 py-3 text-sm text-gray-600">{getCustomerName(ride)}</td>
+                    <td className="px-5 py-3 text-sm text-gray-500">{getCustomerPhone(ride)}</td>
                     <td className="px-5 py-3 text-sm text-gray-600">
                       {getFromLocation(ride)} → {getToLocation(ride)}
                     </td>

@@ -18,9 +18,9 @@ function GoodsDelivery() {
   const fetchDeliveries = async () => {
     setLoading(true);
     try {
-      const response = await adminAPI.getRides(1, 500, { 
-        type: 'goods', 
-        status: statusFilter !== 'all' ? statusFilter : undefined 
+      const response = await adminAPI.getRides(1, 500, {
+        type: 'goods',
+        status: statusFilter !== 'all' ? statusFilter : undefined
       });
 
       let ridesData = [];

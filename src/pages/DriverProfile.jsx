@@ -9,10 +9,12 @@ import {
   Info, Building, Hash, Calendar as CalIcon, DollarSign,
   TrendingUp, Activity, Smartphone, Home, CreditCard as CardIcon,
   Layers, Settings, Key, Camera, Image, File, CheckSquare,
-  Sparkles, Briefcase, UserCheck, UserX
+  Sparkles, Briefcase, UserCheck, UserX, Download, RefreshCw
 } from 'lucide-react';
 import { adminAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import jsPDF from 'jspdf';
+import autoTable from "jspdf-autotable";
 
 function DriverProfile() {
   const { id } = useParams();
@@ -20,8 +22,6 @@ function DriverProfile() {
   const [driver, setDriver] = useState(null);
   const [driverType, setDriverType] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({});
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showUnapproveModal, setShowUnapproveModal] = useState(false);
   const [unapproveReason, setUnapproveReason] = useState('');
@@ -48,7 +48,6 @@ function DriverProfile() {
 
       console.log('Processed driver data:', driverData);
 
-      // Determine driver type based on vehicleType and available fields
       if (driverData) {
         const vehicleType = (driverData.vehicleType || '').toLowerCase();
         const goodsTypes = ['truck', 'container', 'multi axle', 'multiaxle', 'pickup', 'goods', 'lorry', 'trailer'];
@@ -68,7 +67,6 @@ function DriverProfile() {
       }
 
       setDriver(driverData);
-      setEditForm(driverData || {});
     } catch (error) {
       console.error('Error fetching driver:', error);
       toast.error('Failed to load driver details');
@@ -77,15 +75,154 @@ function DriverProfile() {
     }
   };
 
-  const handleSaveEdit = async () => {
-    try {
-      await adminAPI.updateDriver(id, editForm);
-      setDriver(editForm);
-      setEditing(false);
-      toast.success('Driver profile updated successfully');
-    } catch (error) {
-      toast.error('Failed to update profile');
+  const exportToPDF = () => {
+    const doc = new jsPDF("p", "mm", "a4");
+    const date = new Date().toLocaleString();
+
+    // Page 1 - Header
+    doc.setFillColor(41, 98, 255);
+    doc.rect(0, 0, 210, 22, "F");
+    doc.setTextColor(255);
+    doc.setFontSize(16);
+    doc.text("Driver Profile Report", 105, 11, { align: "center" });
+    doc.setFontSize(9);
+    doc.text(`Generated: ${date}`, 105, 17, { align: "center" });
+
+    // Personal Information - Page 1
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
+    doc.text("Personal Information", 14, 35);
+    
+    const personalInfo = [
+      ["Full Name", getFullName()],
+      ["Phone Number", getPhone()],
+      ["Email", getEmail()],
+      ["Address", getAddress()],
+      ["Status", getStatus()],
+      ["Rating", `${getRating()} / 5`],
+      ["Total Rides", getTotalRides()],
+      ["Total Earnings", `${getTotalEarnings().toLocaleString()}`],
+      ["Today's Earnings", `${getValue(driver.todayEarnings, 0).toLocaleString()}`],
+      ["Monthly Earnings", `${getValue(driver.monthlyEarnings, 0).toLocaleString()}`],
+    ];
+
+    autoTable(doc, {
+      startY: 42,
+      body: personalInfo,
+      theme: "grid",
+      styles: { fontSize: 10, cellPadding: 4 },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 70 },
+        1: { cellWidth: 100 },
+      },
+    });
+
+    let yPos = doc.lastAutoTable.finalY + 10;
+
+    // Vehicle Information - Page 1
+    doc.setFontSize(14);
+    doc.text("Vehicle Information", 14, yPos);
+    yPos += 8;
+
+    let vehicleInfo = [];
+    if (driverType === 'cab') {
+      vehicleInfo = [
+        ["Vehicle Type", getValue(driver.vehicleType, 'N/A')],
+        ["Registration Number", getValue(driver.regNumber, 'N/A')],
+        ["Brand / Model", `${getValue(driver.brand, 'N/A')} ${getValue(driver.model, '')}`],
+        ["Year / Color", `${getValue(driver.year, 'N/A')} / ${getValue(driver.color, 'N/A')}`],
+        ["RC Number", getValue(driver.rcNumber, 'N/A')],
+        ["Seat Capacity", `${getValue(driver.seatCapacity, 'N/A')} seats`],
+        ["AC Available", driver.isAC ? 'Yes' : 'No'],
+      ];
+    } else if (driverType === 'goods') {
+      vehicleInfo = [
+        ["Vehicle Type", getValue(driver.vehicleType, 'N/A')],
+        ["Registration Number", getValue(driver.regNumber, 'N/A')],
+        ["Brand / Model", `${getValue(driver.brand, 'N/A')} ${getValue(driver.model, '')}`],
+        ["Year / Color", `${getValue(driver.year, 'N/A')} / ${getValue(driver.color, 'N/A')}`],
+        ["RC Number", getValue(driver.rcNumber, 'N/A')],
+        ["Capacity", `${getValue(driver.capacity, 'N/A')} tons`],
+        ["Vehicle Size", getValue(driver.vehicleSize, 'N/A')],
+      ];
     }
+
+    autoTable(doc, {
+      startY: yPos,
+      body: vehicleInfo,
+      theme: "grid",
+      styles: { fontSize: 10, cellPadding: 4 },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 70 },
+        1: { cellWidth: 100 },
+      },
+    });
+
+    // Insurance Information - Page 1
+    if (driver.insuranceNumber) {
+      yPos = doc.lastAutoTable.finalY + 10;
+      doc.setFontSize(14);
+      doc.text("Insurance Information", 14, yPos);
+      yPos += 8;
+
+      const insuranceInfo = [
+        ["Insurance Number", getValue(driver.insuranceNumber, 'N/A')],
+        ["Insurance Expiry", driver.insuranceExpiry ? new Date(driver.insuranceExpiry).toLocaleDateString() : 'N/A'],
+      ];
+      
+      if (driverType === 'cab') {
+        insuranceInfo.push(["PUC Expiry", driver.pucExpiry ? new Date(driver.pucExpiry).toLocaleDateString() : 'N/A']);
+      }
+
+      autoTable(doc, {
+        startY: yPos,
+        body: insuranceInfo,
+        theme: "grid",
+        styles: { fontSize: 10, cellPadding: 4 },
+        columnStyles: {
+          0: { fontStyle: "bold", cellWidth: 70 },
+          1: { cellWidth: 100 },
+        },
+      });
+    }
+
+    // ID & License Information - NEW PAGE (Page 2)
+    if (driverType === 'cab' && (driver.idType || driver.dlNumber)) {
+      doc.addPage();
+      let yPosPage2 = 20;
+      
+      // Header for page 2
+      doc.setFillColor(41, 98, 255);
+      doc.rect(0, 0, 210, 15, "F");
+      doc.setTextColor(255);
+      doc.setFontSize(12);
+      doc.text("ID & License Information", 105, 10, { align: "center" });
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(12);
+      
+      const licenseInfo = [
+        ["ID Type", getValue(driver.idType, 'N/A')],
+        ["ID Number", getValue(driver.idNumber, 'N/A')],
+        ["Driving License No.", getValue(driver.dlNumber, 'N/A')],
+        ["License Valid From", driver.dlValidFrom ? new Date(driver.dlValidFrom).toLocaleDateString() : 'N/A'],
+        ["License Valid To", driver.dlValidTo ? new Date(driver.dlValidTo).toLocaleDateString() : 'N/A'],
+      ];
+
+      autoTable(doc, {
+        startY: yPosPage2,
+        body: licenseInfo,
+        theme: "grid",
+        styles: { fontSize: 10, cellPadding: 4 },
+        columnStyles: {
+          0: { fontStyle: "bold", cellWidth: 70 },
+          1: { cellWidth: 100 },
+        },
+      });
+    }
+
+    doc.save(`driver_profile_${getFullName()}_${new Date().toISOString().split("T")[0]}.pdf`);
+    toast.success("PDF downloaded successfully");
   };
 
   const handleApproveDriver = async () => {
@@ -127,12 +264,10 @@ function DriverProfile() {
     }
   };
 
-  // Helper function to check if a value exists and is not empty
   const hasValue = (value) => {
     return value !== undefined && value !== null && value !== '' && value !== 'N/A';
   };
 
-  // Common getters with fallback
   const getValue = (value, fallback = 'N/A') => {
     return (value !== undefined && value !== null && value !== '') ? value : fallback;
   };
@@ -182,7 +317,20 @@ function DriverProfile() {
           </div>
         </div>
         <div className="flex gap-3 flex-wrap">
-          {/* Approve Button - Show for all drivers except approved */}
+          <button
+            onClick={exportToPDF}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Export PDF
+          </button>
+          <button
+            onClick={fetchDriverDetails}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
           {getStatus() !== 'approved' && (
             <button
               onClick={() => setShowApproveModal(true)}
@@ -193,7 +341,6 @@ function DriverProfile() {
             </button>
           )}
 
-          {/* Unapprove Button - Show for all drivers except pending */}
           {getStatus() !== 'pending' && (
             <button
               onClick={() => setShowUnapproveModal(true)}
@@ -202,25 +349,6 @@ function DriverProfile() {
               <Ban className="w-4 h-4" />
               Unapprove Driver
             </button>
-          )}
-
-          {/* Edit Button */}
-          {!editing ? (
-            <button onClick={() => setEditing(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2">
-              <Edit2 className="w-4 h-4" />
-              Edit Profile
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <button onClick={() => setEditing(false)} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition flex items-center gap-2">
-                <X className="w-4 h-4" />
-                Cancel
-              </button>
-              <button onClick={handleSaveEdit} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition flex items-center gap-2">
-                <Save className="w-4 h-4" />
-                Save Changes
-              </button>
-            </div>
           )}
         </div>
       </div>
@@ -293,7 +421,7 @@ function DriverProfile() {
           </div>
         </div>
 
-        {/* Personal Information - Always Show */}
+        {/* Personal Information */}
         <div className="p-6 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <User className="w-5 h-5 text-blue-600" />
@@ -313,21 +441,6 @@ function DriverProfile() {
         {/* ============ CAB DRIVER SPECIFIC SECTIONS ============ */}
         {driverType === 'cab' && (
           <>
-            {/* ID & License Documents - Only for Cab Drivers */}
-            <div className="p-6 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <IdCard className="w-5 h-5 text-red-600" />
-                ID & License Documents
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                <div><p className="text-xs text-gray-500">ID Type</p><p className="text-sm text-gray-900">{driver.idType || 'N/A'}</p></div>
-                <div><p className="text-xs text-gray-500">ID Number</p><p className="text-sm text-gray-900">{driver.idNumber || 'N/A'}</p></div>
-                <div><p className="text-xs text-gray-500">Driving License No.</p><p className="text-sm text-gray-900">{driver.dlNumber || 'N/A'}</p></div>
-                <div><p className="text-xs text-gray-500">License Valid From</p><p className="text-sm text-gray-900">{driver.dlValidFrom ? new Date(driver.dlValidFrom).toLocaleDateString() : 'N/A'}</p></div>
-                <div><p className="text-xs text-gray-500">License Valid To</p><p className="text-sm text-gray-900">{driver.dlValidTo ? new Date(driver.dlValidTo).toLocaleDateString() : 'N/A'}</p></div>
-              </div>
-            </div>
-
             {/* Cab Vehicle Information */}
             <div className="p-6 border-b border-gray-100">
               <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -345,9 +458,9 @@ function DriverProfile() {
               </div>
             </div>
 
-            {/* Insurance & PUC - Cab specific */}
+            {/* Insurance & PUC */}
             <div className="p-6 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-900 mb-4 flex-items-center gap-2">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Shield className="w-5 h-5 text-orange-600" />
                 Insurance & PUC
               </h3>
@@ -355,6 +468,21 @@ function DriverProfile() {
                 <div><p className="text-xs text-gray-500">Insurance Number</p><p className="text-sm text-gray-900">{driver.insuranceNumber || 'N/A'}</p></div>
                 <div><p className="text-xs text-gray-500">Insurance Expiry</p><p className="text-sm text-gray-900">{driver.insuranceExpiry ? new Date(driver.insuranceExpiry).toLocaleDateString() : 'N/A'}</p></div>
                 <div><p className="text-xs text-gray-500">PUC Expiry</p><p className="text-sm text-gray-900">{driver.pucExpiry ? new Date(driver.pucExpiry).toLocaleDateString() : 'N/A'}</p></div>
+              </div>
+            </div>
+
+            {/* ID & License Documents */}
+            <div className="p-6">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <IdCard className="w-5 h-5 text-red-600" />
+                ID & License Documents
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div><p className="text-xs text-gray-500">ID Type</p><p className="text-sm text-gray-900">{driver.idType || 'N/A'}</p></div>
+                <div><p className="text-xs text-gray-500">ID Number</p><p className="text-sm text-gray-900">{driver.idNumber || 'N/A'}</p></div>
+                <div><p className="text-xs text-gray-500">Driving License No.</p><p className="text-sm text-gray-900">{driver.dlNumber || 'N/A'}</p></div>
+                <div><p className="text-xs text-gray-500">License Valid From</p><p className="text-sm text-gray-900">{driver.dlValidFrom ? new Date(driver.dlValidFrom).toLocaleDateString() : 'N/A'}</p></div>
+                <div><p className="text-xs text-gray-500">License Valid To</p><p className="text-sm text-gray-900">{driver.dlValidTo ? new Date(driver.dlValidTo).toLocaleDateString() : 'N/A'}</p></div>
               </div>
             </div>
           </>
@@ -382,8 +510,8 @@ function DriverProfile() {
               </div>
             </div>
 
-            {/* Insurance - Goods specific (No PUC) */}
-            <div className="p-6 border-b border-gray-100">
+            {/* Insurance */}
+            <div className="p-6">
               <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Shield className="w-5 h-5 text-orange-600" />
                 Insurance
@@ -396,7 +524,7 @@ function DriverProfile() {
           </>
         )}
 
-        {/* Location - Only if exists (Common for both) */}
+        {/* Location */}
         {hasValue(driver.location?.lat) && (
           <div className="p-6">
             <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -437,17 +565,8 @@ function DriverProfile() {
               <p className="text-xs text-gray-500 mt-1">The driver will be able to start accepting rides immediately.</p>
             </div>
             <div className="flex gap-3 justify-end mt-6">
-              <button
-                onClick={() => setShowApproveModal(false)}
-                className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleApproveDriver}
-                disabled={processing}
-                className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
+              <button onClick={() => setShowApproveModal(false)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
+              <button onClick={handleApproveDriver} disabled={processing} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
                 {processing ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <CheckCircle className="w-4 h-4" />}
                 Confirm Approve
               </button>
@@ -471,24 +590,12 @@ function DriverProfile() {
               <p className="text-xs text-gray-500 mt-1">This will change their status to pending.</p>
             </div>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Reason for unapproving (optional)
-              </label>
-              <textarea
-                value={unapproveReason}
-                onChange={(e) => setUnapproveReason(e.target.value)}
-                placeholder="Optional: Enter reason for unapproving..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows="3"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-2">Reason for unapproving (optional)</label>
+              <textarea value={unapproveReason} onChange={(e) => setUnapproveReason(e.target.value)} placeholder="Optional: Enter reason for unapproving..." className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows="3" />
             </div>
             <div className="flex gap-3 justify-end">
               <button onClick={() => setShowUnapproveModal(false)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
-              <button
-                onClick={handleUnapproveDriver}
-                disabled={processing}
-                className="flex-1 py-2 bg-yellow-600 text-white rounded-lg text-sm font-medium hover:bg-yellow-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
+              <button onClick={handleUnapproveDriver} disabled={processing} className="flex-1 py-2 bg-yellow-600 text-white rounded-lg text-sm font-medium hover:bg-yellow-700 disabled:opacity-50 flex items-center justify-center gap-2">
                 {processing ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <Ban className="w-4 h-4" />}
                 Confirm Unapprove
               </button>

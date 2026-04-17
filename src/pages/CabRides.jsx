@@ -62,109 +62,73 @@ function CabRides() {
     }
   };
 
+  const exportToPDF = () => {
+    const doc = new jsPDF("p", "mm", "a4");
+    const date = new Date().toLocaleString();
 
-const exportToPDF = () => {
-  const doc = new jsPDF("p", "mm", "a4");
-  const date = new Date().toLocaleString();
+    doc.setFillColor(41, 98, 255);
+    doc.rect(0, 0, 210, 22, "F");
+    doc.setTextColor(255);
+    doc.setFontSize(16);
+    doc.text("Cab Rides Report", 105, 11, { align: "center" });
+    doc.setFontSize(9);
+    doc.text(`Generated: ${date}`, 105, 17, { align: "center" });
 
-  // ===== HEADER =====
-  doc.setFillColor(41, 98, 255);
-  doc.rect(0, 0, 210, 22, "F");
+    const statsData = [
+      ["Total Rides", filteredRides.length],
+      ["Completed", stats.completed],
+      ["Cancelled", stats.cancelled],
+      ["Revenue", `₹${stats.totalAmount.toLocaleString()}`],
+    ];
 
-  doc.setTextColor(255);
-  doc.setFontSize(16);
-  doc.text("Cab Rides Report", 105, 11, { align: "center" });
+    autoTable(doc, {
+      startY: 28,
+      body: statsData,
+      theme: "grid",
+      styles: { fontSize: 9, cellPadding: 3 },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 80 },
+        1: { halign: "right" },
+      },
+    });
 
-  doc.setFontSize(9);
-  doc.text(`Generated: ${date}`, 105, 17, { align: "center" });
+    const tableData = filteredRides.map((r) => [
+      `#${r._id?.slice(-5) || "N/A"}`,
+      getAllPassengerNamesText(r),
+      getRouteDisplayText(r),
+      `${new Date(getRideDate(r)).toLocaleDateString()}\n${new Date(getRideDate(r)).toLocaleTimeString()}`,
+      `${getDriverName(r)}`,
+      `₹${getFare(r)}`,
+      getStatusLabel(r.status),
+    ]);
 
-  // ===== STATS =====
-  const statsData = [
-    ["Total Rides", filteredRides.length],
-    ["Completed", stats.completed],
-    ["Cancelled", stats.cancelled],
-    ["Revenue", `${stats.totalAmount.toLocaleString()}`],
-  ];
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 8,
+      head: [["ID", "Passengers", "Route", "Date", "Driver", "Amount", "Status"]],
+      body: tableData,
+      theme: "striped",
+      styles: { fontSize: 7, cellPadding: 2, valign: "middle", overflow: "linebreak" },
+      headStyles: { fillColor: [41, 98, 255], textColor: 255, halign: "center", fontStyle: "bold" },
+      columnStyles: {
+        0: { cellWidth: 15 },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 45 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 25 },
+        5: { cellWidth: 18, halign: "right" },
+        6: { cellWidth: 18, halign: "center" }
+      },
+      didDrawPage: () => {
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Page ${doc.internal.getNumberOfPages()}`, 200, 290, { align: "right" });
+      },
+    });
 
-  autoTable(doc, {
-    startY: 28,
-    body: statsData,
-    theme: "grid",
-    styles: { fontSize: 9, cellPadding: 3 },
-    columnStyles: {
-      0: { fontStyle: "bold", cellWidth: 80 },
-      1: { halign: "right" },
-    },
-  });
+    doc.save(`cab_rides_report_${new Date().toISOString().split("T")[0]}.pdf`);
+    toast.success("PDF downloaded successfully");
+  };
 
-  // ===== TABLE DATA =====
-  const tableData = filteredRides.map((r) => [
-    `#${r._id?.slice(-5) || "N/A"}`,
-    `${getCustomerName(r)}\n${getCustomerPhone(r)}`,
-    `${getFromLocation(r)} -> ${getToLocation(r)}`,
-    `${new Date(getRideDate(r)).toLocaleDateString()}\n${new Date(getRideDate(r)).toLocaleTimeString()}`,
-    `${getDriverName(r)}`,
-    `${getFare(r)}`,
-    getStatusLabel(r.status),
-  ]);
-
-  // ===== MAIN TABLE =====
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 8,
-
-    head: [[
-      "ID",
-      "Customer",
-      "Route",
-      "Date",
-      "Driver",
-      "Amt",
-      "Status"
-    ]],
-
-    body: tableData,
-
-    theme: "striped",
-
-    styles: {
-      fontSize: 7.5,   // 🔥 reduced font size
-      cellPadding: 2,
-      valign: "middle",
-      overflow: "linebreak",
-    },
-
-    headStyles: {
-      fillColor: [41, 98, 255],
-      textColor: 255,
-      halign: "center",
-      fontStyle: "bold",
-    },
-
-    columnStyles: {
-      0: { cellWidth: 15 },                 // ID
-      1: { cellWidth: 35 },                 // Customer
-      2: { cellWidth: 45 },                 // Route (reduced)
-      3: { cellWidth: 28 },                 // Date
-      4: { cellWidth: 30 },                 // Driver
-      5: { cellWidth: 15, halign: "right" }, // Amount
-      6: { cellWidth: 18, halign: "center" } // Status
-    },
-
-    didDrawPage: () => {
-      // FOOTER
-      doc.setFontSize(8);
-      doc.setTextColor(150);
-      doc.text(
-        `Page ${doc.internal.getNumberOfPages()}`,
-        200,
-        290,
-        { align: "right" }
-      );
-    },
-  });
-
-  doc.save(`cab_rides_report_${new Date().toISOString().split("T")[0]}.pdf`);
-};
   const getStatusLabel = (status) => {
     const statusConfig = {
       draft: 'Draft',
@@ -198,46 +162,195 @@ const exportToPDF = () => {
     );
   };
 
-  // Safe getters for ride properties
-  const getCustomerName = (ride) => {
-    return ride.customer?.name || ride.customerName || ride.customerId?.name || 'N/A';
+  // Get all passenger names as array
+  const getAllPassengerNamesArray = (ride) => {
+    let allNames = [];
+    
+    // Get main customer name
+    let mainCustomer = null;
+    if (ride.customerId?.name) mainCustomer = ride.customerId.name;
+    else if (ride.customer?.name) mainCustomer = ride.customer.name;
+    else if (ride.customerName) mainCustomer = ride.customerName;
+    
+    if (mainCustomer) allNames.push(mainCustomer);
+    
+    // Get names from bookedPassengers
+    if (ride.bookedPassengers && ride.bookedPassengers.length > 0) {
+      ride.bookedPassengers.forEach(p => {
+        let name = null;
+        if (typeof p === 'object' && p.name) {
+          name = p.name;
+        } else if (typeof p === 'string' && !p.match(/^[0-9a-fA-F]{24}$/)) {
+          name = p;
+        }
+        if (name && name !== mainCustomer && !allNames.includes(name)) {
+          allNames.push(name);
+        }
+      });
+    }
+    
+    // Get names from bookings
+    if (ride.bookings && ride.bookings.length > 0) {
+      ride.bookings.forEach(booking => {
+        if (booking.customerName && booking.customerName !== mainCustomer && !allNames.includes(booking.customerName)) {
+          allNames.push(booking.customerName);
+        }
+      });
+    }
+    
+    // Remove duplicates and filter out IDs
+    allNames = [...new Set(allNames)];
+    allNames = allNames.filter(name => name && !name.match(/^[0-9a-fA-F]{24}$/));
+    
+    return allNames;
   };
 
-  const getCustomerPhone = (ride) => {
-    return ride.customer?.phone || ride.customerPhone || ride.customerId?.phone || '';
+  // Get individual routes for each passenger
+  const getIndividualRoutes = (ride) => {
+    let routes = [];
+    
+    // Get routes from bookings (each booking has fromCity, toCity and customerName)
+    if (ride.bookings && ride.bookings.length > 0) {
+      ride.bookings.forEach(booking => {
+        if (booking.fromCity && booking.toCity && booking.fromCity !== booking.toCity) {
+          const passengerName = booking.customerName || 'Passenger';
+          routes.push({
+            passenger: passengerName,
+            from: booking.fromCity,
+            to: booking.toCity
+          });
+        }
+      });
+    }
+    
+    // If no bookings, get from segments with generic passenger
+    if (routes.length === 0 && ride.segments && ride.segments.length > 0) {
+      ride.segments.forEach(segment => {
+        if (segment.fromCity && segment.toCity && segment.fromCity !== segment.toCity) {
+          routes.push({
+            passenger: 'Passenger',
+            from: segment.fromCity,
+            to: segment.toCity
+          });
+        }
+      });
+    }
+    
+    return routes;
   };
 
-  const getFromLocation = (ride) => {
-    return ride.from || ride.fromCity || ride.pickupLocation?.address || 'N/A';
+  // Get passenger names as text for PDF
+  const getAllPassengerNamesText = (ride) => {
+    const names = getAllPassengerNamesArray(ride);
+    if (names.length === 0) return 'No passengers';
+    return names.join('\n');
   };
 
-  const getToLocation = (ride) => {
-    return ride.to || ride.toCity || ride.dropLocation?.address || 'N/A';
+  // Get route display as text for PDF
+  const getRouteDisplayText = (ride) => {
+    let routeLines = [];
+    
+    // Main route
+    let mainRoute = getMainRoute(ride);
+    if (mainRoute !== 'N/A') {
+      routeLines.push(mainRoute);
+    }
+    
+    // Individual routes
+    const individualRoutes = getIndividualRoutes(ride);
+    individualRoutes.forEach(route => {
+      routeLines.push(`  ${route.from} → ${route.to}`);
+    });
+    
+    if (routeLines.length === 0) return '-';
+    return routeLines.join('\n');
+  };
+
+  // Get route display for UI
+  const getRouteDisplay = (ride) => {
+    let routes = [];
+    
+    // Main route
+    let mainRoute = getMainRoute(ride);
+    if (mainRoute !== 'N/A') {
+      routes.push({ type: 'main', text: mainRoute });
+    }
+    
+    // Individual routes
+    const individualRoutes = getIndividualRoutes(ride);
+    individualRoutes.forEach(route => {
+      routes.push({ type: 'individual', text: `${route.from} → ${route.to}` });
+    });
+    
+    return routes;
+  };
+
+  // Get main route
+  const getMainRoute = (ride) => {
+    if (ride.segments && ride.segments.length > 0) {
+      const firstSegment = ride.segments[0];
+      const lastSegment = ride.segments[ride.segments.length - 1];
+      if (firstSegment?.fromCity && lastSegment?.toCity) {
+        if (firstSegment.fromCity === lastSegment.toCity) return firstSegment.fromCity;
+        return `${firstSegment.fromCity} → ${lastSegment.toCity}`;
+      }
+    }
+    
+    if (ride.routeMajorCities && ride.routeMajorCities.length >= 2) {
+      const first = ride.routeMajorCities[0];
+      const last = ride.routeMajorCities[ride.routeMajorCities.length - 1];
+      if (first === last) return first;
+      return `${first} → ${last}`;
+    }
+    
+    if (ride.fromCity && ride.toCity) {
+      if (ride.fromCity === ride.toCity) return ride.fromCity;
+      return `${ride.fromCity} → ${ride.toCity}`;
+    }
+    
+    if (ride.pickupLocation?.address && ride.dropLocation?.address) {
+      const from = ride.pickupLocation.address.split(',')[0];
+      const to = ride.dropLocation.address.split(',')[0];
+      if (from === to) return from;
+      return `${from} → ${to}`;
+    }
+    
+    return 'N/A';
   };
 
   const getDriverName = (ride) => {
-    return ride.driver?.name || ride.driverName || ride.driverId?.name || 'Not assigned';
+    if (ride.driverId?.name) return ride.driverId.name;
+    if (ride.driver?.name) return ride.driver.name;
+    if (ride.driverName) return ride.driverName;
+    return 'Not assigned';
   };
 
   const getDriverPhone = (ride) => {
-    return ride.driver?.phone || ride.driverPhone || ride.driverId?.phone || '';
+    if (ride.driverId?.phone) return ride.driverId.phone;
+    if (ride.driver?.phone) return ride.driver.phone;
+    if (ride.driverPhone) return ride.driverPhone;
+    return '';
   };
 
   const getFare = (ride) => {
-    return ride.fare || ride.price || ride.amount || 0;
+    if (ride.pricePerSeat) return ride.pricePerSeat;
+    if (ride.bookings && ride.bookings.length > 0 && ride.bookings[0].pricing?.customerAmount) {
+      return Math.round(ride.bookings[0].pricing.customerAmount);
+    }
+    return ride.price || ride.fare || ride.amount || 0;
   };
 
   const getRideDate = (ride) => {
-    return ride.date || ride.createdAt || ride.departureDate || new Date();
+    return ride.departureDate || ride.createdAt || new Date();
   };
 
   const filteredRides = rides.filter(ride => {
     const searchLower = searchTerm.toLowerCase();
+    const passengerNames = getAllPassengerNamesArray(ride).join(' ').toLowerCase();
     return (
-      getCustomerName(ride).toLowerCase().includes(searchLower) ||
-      getCustomerPhone(ride).toLowerCase().includes(searchLower) ||
-      getFromLocation(ride).toLowerCase().includes(searchLower) ||
-      getToLocation(ride).toLowerCase().includes(searchLower)
+      passengerNames.includes(searchLower) ||
+      getMainRoute(ride).toLowerCase().includes(searchLower) ||
+      getDriverName(ride).toLowerCase().includes(searchLower)
     );
   });
 
@@ -272,7 +385,7 @@ const exportToPDF = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by customer, phone or location..."
+              placeholder="Search by passenger, route or driver..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
@@ -309,7 +422,7 @@ const exportToPDF = () => {
         </div>
       </div>
 
-      {/* Stats Cards - Based on schema */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
         <div className="bg-white rounded-xl p-3 shadow-sm text-center">
           <p className="text-xl font-bold text-gray-600">{stats.draft}</p>
@@ -352,13 +465,13 @@ const exportToPDF = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[900px]">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ride ID</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer / Mobile</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Passengers</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Route</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date & Time</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Driver</th>
@@ -374,43 +487,55 @@ const exportToPDF = () => {
                   </td>
                 </tr>
               ) : (
-                filteredRides.map((ride) => (
-                  <tr key={ride._id || ride.id} className="hover:bg-gray-50 transition">
-                    <td className="px-5 py-3 text-sm font-medium text-gray-900">
-                      #{ride._id?.slice(-6) || ride.id?.slice(-6) || 'N/A'}
-                    </td>
-                    <td className="px-5 py-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{getCustomerName(ride)}</p>
-                        <p className="text-xs text-gray-500">{getCustomerPhone(ride)}</p>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-gray-400" />
-                        <span className="text-sm text-gray-600 max-w-[150px] truncate">{getFromLocation(ride)}</span>
-                        <span className="text-gray-400">→</span>
-                        <span className="text-sm text-gray-600 max-w-[150px] truncate">{getToLocation(ride)}</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 text-sm text-gray-500">
-                      {new Date(getRideDate(ride)).toLocaleDateString()} <br />
-                      <span className="text-xs">{new Date(getRideDate(ride)).toLocaleTimeString()}</span>
-                    </td>
-                    <td className="px-5 py-3">
-                      {getDriverName(ride) !== 'Not assigned' ? (
-                        <div>
-                          <p className="text-sm text-gray-900">{getDriverName(ride)}</p>
-                          <p className="text-xs text-gray-500">{getDriverPhone(ride)}</p>
+                filteredRides.map((ride) => {
+                  const passengers = getAllPassengerNamesArray(ride);
+                  const routes = getRouteDisplay(ride);
+                  return (
+                    <tr key={ride._id || ride.id} className="hover:bg-gray-50 transition">
+                      <td className="px-5 py-3 text-sm font-medium text-gray-900">
+                        #{ride._id?.slice(-6) || ride.id?.slice(-6) || 'N/A'}
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="max-w-[200px]">
+                          {passengers.length > 0 ? (
+                            passengers.map((name, idx) => (
+                              <p key={idx} className="text-sm text-gray-900">
+                                {name}
+                              </p>
+                            ))
+                          ) : (
+                            <p className="text-sm text-gray-500">No passengers</p>
+                          )}
                         </div>
-                      ) : (
-                        <span className="text-sm text-gray-400">Not assigned</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-sm font-semibold text-gray-900">₹{getFare(ride)}</td>
-                    <td className="px-5 py-3">{getStatusBadge(ride.status)}</td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="max-w-[280px]">
+                          {routes.map((route, idx) => (
+                            <p key={idx} className={`${route.type === 'main' ? 'text-sm font-semibold text-gray-900' : 'text-xs text-gray-500 ml-2'}`}>
+                              {route.type === 'main' ? route.text : `↳ ${route.text}`}
+                            </p>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-sm text-gray-500">
+                        {new Date(getRideDate(ride)).toLocaleDateString()} <br />
+                        <span className="text-xs">{new Date(getRideDate(ride)).toLocaleTimeString()}</span>
+                      </td>
+                      <td className="px-5 py-3">
+                        {getDriverName(ride) !== 'Not assigned' ? (
+                          <div>
+                            <p className="text-sm text-gray-900">{getDriverName(ride)}</p>
+                            <p className="text-xs text-gray-500">{getDriverPhone(ride)}</p>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">Not assigned</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3 text-sm font-semibold text-gray-900">₹{getFare(ride)}</td>
+                      <td className="px-5 py-3">{getStatusBadge(ride.status)}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -422,7 +547,7 @@ const exportToPDF = () => {
           <div className="bg-white rounded-xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Cancel Ride</h3>
             <p className="text-sm text-gray-600 mb-3">Ride ID: #{selectedRide?._id?.slice(-6)}</p>
-            <p className="text-sm text-gray-600 mb-3">Customer: {getCustomerName(selectedRide)}</p>
+            <p className="text-sm text-gray-600 mb-3">Passengers: {getAllPassengerNamesArray(selectedRide).join(', ')}</p>
             <textarea
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}

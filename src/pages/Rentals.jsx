@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Car, Truck, Eye, X, Download, RefreshCw, Search, Calendar, Clock, User, Phone, Hash, DollarSign, Calendar as CalIcon } from 'lucide-react';
+import { Car, Truck, Eye, X, Download, RefreshCw, Search, Calendar, Clock, User, Phone, Hash, DollarSign, Calendar as CalIcon, TrendingUp } from 'lucide-react';
 import { adminAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
@@ -102,26 +102,28 @@ function Rentals() {
       `${r.customerName || "N/A"}\n${r.customerNumber || ""}`,
       `${r.driverName || "Not assigned"}\n${r.driverNumber || ""}`,
       `${formatDate(r.startDate)}\n-> ${formatDate(r.endDate)}`,
-      `${r.cost || 0}`,
+      `₹${r.cost || 0}`,
+      r.counterOfferPrice ? `₹${r.counterOfferPrice}` : '-',
       (r.status || "pending").toUpperCase(),
     ]);
 
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 8,
-      head: [["No", "Vehicle", "Type", "Customer", "Driver", "Period", "Amount", "Status"]],
+      head: [["No", "Vehicle", "Type", "Customer", "Driver", "Period", "Amount", "Counter Offer", "Status"]],
       body: tableData,
       theme: "striped",
       styles: { fontSize: 7.5, cellPadding: 2.5, valign: "middle", overflow: "linebreak" },
       headStyles: { fillColor: [41, 98, 255], textColor: 255, halign: "center", fontStyle: "bold" },
       columnStyles: {
         0: { cellWidth: 10, halign: "center" },
-        1: { cellWidth: 24 },
-        2: { cellWidth: 16, halign: "center" },
-        3: { cellWidth: 32 },
-        4: { cellWidth: 32 },
-        5: { cellWidth: 36 },
-        6: { cellWidth: 20, halign: "right" },
-        7: { cellWidth: 20, halign: "center" },
+        1: { cellWidth: 22 },
+        2: { cellWidth: 14, halign: "center" },
+        3: { cellWidth: 30 },
+        4: { cellWidth: 30 },
+        5: { cellWidth: 34 },
+        6: { cellWidth: 18, halign: "right" },
+        7: { cellWidth: 20, halign: "right" },
+        8: { cellWidth: 18, halign: "center" },
       },
       didDrawPage: () => {
         doc.setFontSize(8);
@@ -291,6 +293,7 @@ function Rentals() {
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Driver</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">From → To</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Counter Offer</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
             </tr>
@@ -298,7 +301,7 @@ function Rentals() {
           <tbody className="divide-y divide-gray-100">
             {filteredRentals.length === 0 ? (
               <tr>
-                <td colSpan="9" className="px-4 py-8 text-center text-gray-500">No rentals found</td>
+                <td colSpan="10" className="px-4 py-8 text-center text-gray-500">No rentals found</td>
               </tr>
             ) : (
               filteredRentals.map((rental, index) => (
@@ -331,6 +334,13 @@ function Rentals() {
                     <p className="text-xs text-gray-400 mt-1">{rental.duration}</p>
                   </td>
                   <td className="px-4 py-3 text-sm font-semibold text-green-600">{formatCurrency(rental.cost)}</td>
+                  <td className="px-4 py-3">
+                    {rental.counterOfferPrice ? (
+                      <span className="text-sm font-semibold text-orange-600">{formatCurrency(rental.counterOfferPrice)}</span>
+                    ) : (
+                      <span className="text-sm text-gray-400">-</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">{getStatusBadge(rental.status)}</td>
                   <td className="px-4 py-3">
                     <button onClick={() => { setSelectedRental(rental); setShowModal(true); }} className="p-1 text-blue-600 hover:bg-blue-50 rounded">
@@ -344,7 +354,7 @@ function Rentals() {
         </table>
       </div>
 
-      {/* ========== PERFECT SEPARATE MODAL ========== */}
+      {/* Modal */}
       {showModal && selectedRental && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -467,9 +477,17 @@ function Rentals() {
                     <p className="text-2xl font-bold text-green-600">{formatCurrency(selectedRental.cost)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Status</p>
-                    {getStatusBadge(selectedRental.status)}
+                    <p className="text-xs text-gray-500">Counter Offer</p>
+                    {selectedRental.counterOfferPrice ? (
+                      <p className="text-xl font-bold text-orange-600">{formatCurrency(selectedRental.counterOfferPrice)}</p>
+                    ) : (
+                      <p className="text-gray-400">Not offered</p>
+                    )}
                   </div>
+                </div>
+                <div className="mt-3 pt-2 border-t">
+                  <p className="text-xs text-gray-500">Status</p>
+                  {getStatusBadge(selectedRental.status)}
                 </div>
               </div>
             </div>
