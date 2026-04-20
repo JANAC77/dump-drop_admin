@@ -129,6 +129,8 @@ getDriverCommission: () => api.get('/commission/driver'),
     const queryString = new URLSearchParams(params).toString();
     return api.get(`/bookings${queryString ? `?${queryString}` : ''}`);
   },
+  // Cancel booking
+  cancelBooking: (id, data) => api.put(`/bookings/${id}/cancel`, data),
   exportBookings: (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
     return api.get(`/bookings/export${queryString ? `?${queryString}` : ''}`, {

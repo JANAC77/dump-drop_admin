@@ -5,7 +5,6 @@ import {
     Eye,
     Download,
     RefreshCw,
-    Filter,
     X,
     User,
     MapPin,
@@ -15,7 +14,7 @@ import {
     XCircle,
     Truck,
     Car,
-    FileText
+    AlertTriangle
 } from 'lucide-react';
 import { adminAPI } from '../services/api';
 import toast from 'react-hot-toast';
@@ -32,6 +31,10 @@ function AllBookings() {
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
     const [selectedBooking, setSelectedBooking] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [showCancelModal, setShowCancelModal] = useState(false);
+    const [cancelBookingId, setCancelBookingId] = useState(null);
+    const [cancelReason, setCancelReason] = useState('');
+    const [cancelling, setCancelling] = useState(false);
     const [stats, setStats] = useState({
         total: 0,
         draft: 0,
@@ -48,42 +51,63 @@ function AllBookings() {
 
     useEffect(() => {
         fetchBookings();
-    }, []);
-
-    useEffect(() => {
-        filterBookings();
-    }, [searchTerm, selectedType, selectedStatus, dateRange, bookings]);
+    }, [selectedType, selectedStatus, currentPage]);
 
     const fetchBookings = async () => {
         setLoading(true);
         try {
-            const response = await adminAPI.getBookings({
+            const params = {
                 page: currentPage,
-                limit: 500,
-            });
+                limit: 20,
+                type: selectedType,
+                status: selectedStatus,
+                startDate: dateRange.start,
+                endDate: dateRange.end,
+                search: searchTerm
+            };
+
+            const response = await adminAPI.getBookings(params);
 
             if (response.data.success) {
                 setBookings(response.data.bookings || []);
-                const bookingsData = response.data.bookings || [];
-                const calculatedStats = {
-                    total: bookingsData.length,
-                    draft: bookingsData.filter(b => b.status === 'draft').length,
-                    searching: bookingsData.filter(b => b.status === 'searching').length,
-                    available: bookingsData.filter(b => b.status === 'available').length,
-                    accepted: bookingsData.filter(b => b.status === 'accepted').length,
-                    ongoing: bookingsData.filter(b => b.status === 'ongoing').length,
-                    completed: bookingsData.filter(b => b.status === 'completed').length,
-                    cancelled: bookingsData.filter(b => b.status === 'cancelled').length,
-                    totalAmount: bookingsData.reduce((sum, b) => sum + (b.amount || 0), 0)
-                };
-                setStats(calculatedStats);
+                setStats(response.data.stats || {});
                 setTotalPages(response.data.pages || 1);
+                setFilteredBookings(response.data.bookings || []);
             }
         } catch (error) {
             console.error('Error fetching bookings:', error);
             toast.error('Failed to load bookings');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCancelBooking = async () => {
+        if (!cancelBookingId) return;
+        
+        if (!cancelReason.trim()) {
+            toast.error('Please provide a reason for cancellation');
+            return;
+        }
+        
+        setCancelling(true);
+        try {
+            const response = await adminAPI.cancelBooking(cancelBookingId, { reason: cancelReason });
+            
+            if (response.data.success) {
+                toast.success('Booking cancelled successfully');
+                setShowCancelModal(false);
+                setCancelReason('');
+                setCancelBookingId(null);
+                fetchBookings();
+            } else {
+                toast.error(response.data.message || 'Failed to cancel booking');
+            }
+        } catch (error) {
+            console.error('Error cancelling booking:', error);
+            toast.error(error.response?.data?.message || 'Failed to cancel booking');
+        } finally {
+            setCancelling(false);
         }
     };
 
@@ -102,14 +126,6 @@ function AllBookings() {
             );
         }
 
-        if (selectedType !== 'all') {
-            filtered = filtered.filter(booking => booking.rideType === selectedType);
-        }
-
-        if (selectedStatus !== 'all') {
-            filtered = filtered.filter(booking => booking.status === selectedStatus);
-        }
-
         if (dateRange.start && dateRange.end) {
             const startDate = new Date(dateRange.start);
             const endDate = new Date(dateRange.end);
@@ -122,26 +138,12 @@ function AllBookings() {
         }
 
         setFilteredBookings(filtered);
-        
-        const filteredStats = {
-            total: filtered.length,
-            draft: filtered.filter(b => b.status === 'draft').length,
-            searching: filtered.filter(b => b.status === 'searching').length,
-            available: filtered.filter(b => b.status === 'available').length,
-            accepted: filtered.filter(b => b.status === 'accepted').length,
-            ongoing: filtered.filter(b => b.status === 'ongoing').length,
-            completed: filtered.filter(b => b.status === 'completed').length,
-            cancelled: filtered.filter(b => b.status === 'cancelled').length,
-            totalAmount: filtered.reduce((sum, b) => sum + (b.amount || 0), 0)
-        };
-        setStats(filteredStats);
     };
 
     const exportToPDF = () => {
         const doc = new jsPDF("p", "mm", "a4");
         const date = new Date().toLocaleString();
 
-        // Header
         doc.setFillColor(41, 98, 255);
         doc.rect(0, 0, 210, 22, "F");
         doc.setTextColor(255);
@@ -150,7 +152,6 @@ function AllBookings() {
         doc.setFontSize(9);
         doc.text(`Generated: ${date}`, 105, 17, { align: "center" });
 
-        // Stats Summary
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(12);
         doc.text("Statistics Summary", 14, 30);
@@ -178,33 +179,49 @@ function AllBookings() {
             },
         });
 
-        // Table Data
-        const tableData = filteredBookings.map((booking, i) => [
-            i + 1,
-            booking._id?.slice(-8) || 'N/A',
-            booking.rideType === 'cab' ? 'Cab' : 'Goods',
-            `${booking.customer?.name || 'N/A'}\n${booking.customer?.phone || 'N/A'}`,
-            `${booking.driver?.name || 'Not assigned'}\n${booking.driver?.phone || 'N/A'}`,
-            `${booking.fromCity || 'N/A'} -> ${booking.toCity || 'N/A'}`,
-            `${booking.amount || 0}`,
-            new Date(booking.createdAt).toLocaleDateString(),
-            booking.status || 'N/A',
-        ]);
+        const tableData = filteredBookings.map((booking, i) => {
+            if (booking.rideType === 'cab') {
+                const passengerDetails = booking.passengerDetails || [];
+                return [
+                    i + 1,
+                    booking._id?.slice(-8) || 'N/A',
+                    'Cab',
+                    passengerDetails.map(p => p.name).join('\n') || 'No passengers',
+                    passengerDetails.map(p => p.route).join('\n') || '-',
+                    booking.mainRoute || 'N/A',
+                    `${booking.amount || 0}`,
+                    new Date(booking.createdAt).toLocaleDateString(),
+                    booking.status || 'N/A',
+                ];
+            } else {
+                return [
+                    i + 1,
+                    booking._id?.slice(-8) || 'N/A',
+                    'Goods',
+                    booking.customer?.name || 'N/A',
+                    `${booking.fromCity || 'N/A'} -> ${booking.toCity || 'N/A'}`,
+                    '-',
+                    `${booking.amount || 0}`,
+                    new Date(booking.createdAt).toLocaleDateString(),
+                    booking.status || 'N/A',
+                ];
+            }
+        });
 
         autoTable(doc, {
             startY: doc.lastAutoTable.finalY + 10,
-            head: [["No", "ID", "Type", "Customer / Phone", "Driver / Phone", "Route", "Amount", "Date", "Status"]],
+            head: [["No", "ID", "Type", "Customer/Passengers", "Route Details", "Main Route", "Amount", "Date", "Status"]],
             body: tableData,
             theme: "striped",
-            styles: { fontSize: 7, cellPadding: 2, valign: "middle" },
+            styles: { fontSize: 6.5, cellPadding: 2, valign: "middle", overflow: "linebreak" },
             headStyles: { fillColor: [41, 98, 255], textColor: 255, halign: "center", fontStyle: "bold" },
             columnStyles: {
                 0: { cellWidth: 10, halign: "center" },
-                1: { cellWidth: 22 },
+                1: { cellWidth: 18 },
                 2: { cellWidth: 12, halign: "center" },
-                3: { cellWidth: 20 },
-                4: { cellWidth: 20 },
-                5: { cellWidth: 40 },
+                3: { cellWidth: 25 },
+                4: { cellWidth: 30 },
+                5: { cellWidth: 20 },
                 6: { cellWidth: 18, halign: "right" },
                 7: { cellWidth: 20, halign: "center" },
                 8: { cellWidth: 18, halign: "center" },
@@ -253,7 +270,13 @@ function AllBookings() {
         setSelectedType('all');
         setSelectedStatus('all');
         setDateRange({ start: '', end: '' });
+        setCurrentPage(1);
+        fetchBookings();
     };
+
+    useEffect(() => {
+        filterBookings();
+    }, [searchTerm, dateRange, bookings]);
 
     if (loading && bookings.length === 0) {
         return (
@@ -289,7 +312,7 @@ function AllBookings() {
                 </div>
             </div>
 
-            {/* Status Dashboard Cards */}
+            {/* Status Dashboard Cards - All 7 Status Types */}
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
                 <div className="bg-white rounded-xl p-3 shadow-sm text-center border-l-4 border-blue-500">
                     <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
@@ -321,25 +344,25 @@ function AllBookings() {
                 </div>
             </div>
 
-            {/* Cancelled and Revenue Card */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-gradient-to-r from-green-600 to-teal-500 rounded-xl p-4 text-white">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <p className="text-sm opacity-80">Total Revenue</p>
-                            <p className="text-2xl font-bold">{formatCurrency(stats.totalAmount || 0)}</p>
-                        </div>
-                        <DollarSign className="w-10 h-10 opacity-50" />
+            {/* Cancelled Card */}
+            <div className="bg-gradient-to-r from-red-600 to-orange-500 rounded-xl p-3 text-white">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <p className="text-[10px] opacity-80">Cancelled Bookings</p>
+                        <p className="text-xl font-bold">{stats.cancelled}</p>
                     </div>
+                    <XCircle className="w-8 h-8 opacity-50" />
                 </div>
-                 <div className="bg-gradient-to-r from-red-600 to-orange-500 rounded-xl p-4 text-white">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <p className="text-sm opacity-80">Cancelled Bookings</p>
-                            <p className="text-2xl font-bold">{stats.cancelled}</p>
-                        </div>
-                        <XCircle className="w-10 h-10 opacity-50" />
+            </div>
+
+            {/* Revenue Card */}
+            <div className="bg-gradient-to-r from-green-600 to-teal-500 rounded-xl p-3 text-white">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <p className="text-[10px] opacity-80">Total Revenue</p>
+                        <p className="text-xl font-bold">{formatCurrency(stats.totalAmount || 0)}</p>
                     </div>
+                    <DollarSign className="w-8 h-8 opacity-50" />
                 </div>
             </div>
 
@@ -410,94 +433,181 @@ function AllBookings() {
                 </div>
             </div>
 
-            {/* Bookings Table - Compact */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1000px]">
-                        <thead className="bg-gray-50">
+            {/* Bookings Table */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
+                <table className="w-full min-w-[1000px]">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">No</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Customer / Passengers</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Route Details</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Driver</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {filteredBookings.length === 0 ? (
                             <tr>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">No</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Customer / Phone</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Driver / Phone</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Route</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                                <td colSpan="10" className="px-3 py-8 text-center text-gray-500">
+                                    No bookings found
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {filteredBookings.length === 0 ? (
-                                <tr>
-                                    <td colSpan="10" className="px-3 py-8 text-center text-gray-500">
-                                        No bookings found
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredBookings.map((booking, index) => (
-                                    <tr key={booking._id} className="hover:bg-gray-50 transition">
-                                        <td className="px-3 py-2 text-sm text-gray-500">{index + 1}</td>
-                                        <td className="px-3 py-2 text-sm font-medium text-gray-900">
-                                            #{booking._id?.slice(-8)}
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            <div className="flex items-center gap-1">
-                                                {booking.rideType === 'cab' ?
-                                                    <Car className="w-3 h-3 text-blue-600" /> :
+                        ) : (
+                            filteredBookings.map((booking, index) => {
+                                if (booking.rideType === 'cab') {
+                                    const passengerDetails = booking.passengerDetails || [];
+                                    return (
+                                        <tr key={booking._id} className="hover:bg-gray-50 transition">
+                                            <td className="px-3 py-2 text-sm text-gray-500">{index + 1}</td>
+                                            <td className="px-3 py-2 text-sm font-medium text-gray-900">
+                                                #{booking._id?.slice(-8)}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <div className="flex items-center gap-1">
+                                                    <Car className="w-3 h-3 text-blue-600" />
+                                                    <span className="text-xs text-gray-600">Cab</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <div className="max-w-[180px]">
+                                                    {passengerDetails.length === 0 ? (
+                                                        <p className="text-xs text-gray-500">No passengers</p>
+                                                    ) : (
+                                                        passengerDetails.map((p, idx) => (
+                                                            <p key={idx} className="text-xs text-gray-900 leading-tight">
+                                                                {p.name}
+                                                            </p>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <div className="max-w-[180px]">
+                                                    <p className="text-xs text-gray-600">{booking.mainRoute || 'N/A'}</p>
+                                                    {passengerDetails.length > 0 && (
+                                                        <div className="mt-1 pt-1 border-t border-gray-100">
+                                                            {passengerDetails.map((p, idx) => (
+                                                                <p key={idx} className="text-[9px] text-gray-400">
+                                                                    {p.route}
+                                                                </p>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <p className="text-sm text-gray-900">{booking.driver?.name || 'Not assigned'}</p>
+                                                <p className="text-xs text-gray-500">{booking.driver?.phone || ''}</p>
+                                            </td>
+                                            <td className="px-3 py-2 text-sm font-semibold text-green-600 whitespace-nowrap">
+                                                {formatCurrency(booking.amount || 0)}
+                                            </td>
+                                            <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                                                {new Date(booking.createdAt).toLocaleDateString()}
+                                            </td>
+                                            <td className="px-3 py-2">{getStatusBadge(booking.status)}</td>
+                                            <td className="px-3 py-2">
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedBooking(booking);
+                                                            setShowModal(true);
+                                                        }}
+                                                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                                        title="View Details"
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                    </button>
+                                                    {booking.status !== 'cancelled' && booking.status !== 'completed' && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setCancelBookingId(booking._id);
+                                                                setShowCancelModal(true);
+                                                            }}
+                                                            className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                                            title="Cancel Booking"
+                                                        >
+                                                            <XCircle className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                } else {
+                                    return (
+                                        <tr key={booking._id} className="hover:bg-gray-50 transition">
+                                            <td className="px-3 py-2 text-sm text-gray-500">{index + 1}</td>
+                                            <td className="px-3 py-2 text-sm font-medium text-gray-900">
+                                                #{booking._id?.slice(-8)}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <div className="flex items-center gap-1">
                                                     <Truck className="w-3 h-3 text-green-600" />
-                                                }
-                                                <span className="text-xs text-gray-600">
-                                                    {booking.rideType === 'cab' ? 'Cab' : 'Goods'}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            <div className="max-w-[140px]">
-                                                <p className="text-sm font-medium text-gray-900 truncate">{booking.customer?.name || 'N/A'}</p>
-                                                <p className="text-xs text-gray-500 truncate">{booking.customer?.phone || 'N/A'}</p>
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            <div className="max-w-[140px]">
-                                                <p className="text-sm text-gray-900 truncate">{booking.driver?.name || 'Not assigned'}</p>
-                                                <p className="text-xs text-gray-500 truncate">{booking.driver?.phone || ''}</p>
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            <div className="flex items-center gap-1 max-w-[180px]">
-                                                <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                                                <span className="text-xs text-gray-600 truncate">{booking.fromCity || 'N/A'}</span>
-                                                <span className="text-gray-400 text-xs">→</span>
-                                                <span className="text-xs text-gray-600 truncate">{booking.toCity || 'N/A'}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-2 text-sm font-semibold text-green-600 whitespace-nowrap">
-                                            {formatCurrency(booking.amount || 0)}
-                                        </td>
-                                        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
-                                            {new Date(booking.createdAt).toLocaleDateString()}
-                                        </td>
-                                        <td className="px-3 py-2">{getStatusBadge(booking.status)}</td>
-                                        <td className="px-3 py-2">
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedBooking(booking);
-                                                    setShowModal(true);
-                                                }}
-                                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                                title="View Details"
-                                            >
-                                                <Eye className="w-4 h-4" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                                    <span className="text-xs text-gray-600">Goods</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <p className="text-sm text-gray-900">{booking.customer?.name || 'N/A'}</p>
+                                                <p className="text-xs text-gray-500">{booking.customer?.phone || 'N/A'}</p>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <div className="flex items-center gap-1">
+                                                    <MapPin className="w-3 h-3 text-gray-400" />
+                                                    <span className="text-xs text-gray-600">{booking.fromCity || 'N/A'}</span>
+                                                    <span className="text-gray-400 text-xs">→</span>
+                                                    <span className="text-xs text-gray-600">{booking.toCity || 'N/A'}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <p className="text-sm text-gray-900">{booking.driver?.name || 'Not assigned'}</p>
+                                                <p className="text-xs text-gray-500">{booking.driver?.phone || ''}</p>
+                                            </td>
+                                            <td className="px-3 py-2 text-sm font-semibold text-green-600 whitespace-nowrap">
+                                                {formatCurrency(booking.amount || 0)}
+                                            </td>
+                                            <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                                                {new Date(booking.createdAt).toLocaleDateString()}
+                                            </td>
+                                            <td className="px-3 py-2">{getStatusBadge(booking.status)}</td>
+                                            <td className="px-3 py-2">
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedBooking(booking);
+                                                            setShowModal(true);
+                                                        }}
+                                                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                                        title="View Details"
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                    </button>
+                                                    {booking.status !== 'cancelled' && booking.status !== 'completed' && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setCancelBookingId(booking._id);
+                                                                setShowCancelModal(true);
+                                                            }}
+                                                            className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                                            title="Cancel Booking"
+                                                        >
+                                                            <XCircle className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                }
+                            })
+                        )}
+                    </tbody>
+                </table>
             </div>
 
             {/* Booking Details Modal */}
@@ -507,7 +617,7 @@ function AllBookings() {
                         <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex justify-between items-center">
                             <h3 className="text-lg font-bold text-gray-900">Booking Details</h3>
                             <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
-                                <XCircle className="w-5 h-5" />
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
 
@@ -534,45 +644,65 @@ function AllBookings() {
                                 </div>
                             </div>
 
-                            {/* Ride Details */}
-                            <div className="border border-gray-200 rounded-lg p-3">
-                                <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
-                                    <MapPin className="w-4 h-4 text-blue-600" />
-                                    Ride Details
-                                </h4>
-                                <div className="space-y-1">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">From</span>
-                                        <span className="font-medium">{selectedBooking.fromCity || 'N/A'}</span>
+                            {selectedBooking.rideType === 'cab' ? (
+                                <>
+                                    <div className="border border-gray-200 rounded-lg p-3">
+                                        <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                                            <User className="w-4 h-4" />
+                                            Passengers
+                                        </h4>
+                                        {(selectedBooking.passengerDetails || []).length === 0 ? (
+                                            <p className="text-sm text-gray-500">No passengers</p>
+                                        ) : (
+                                            (selectedBooking.passengerDetails || []).map((p, idx) => (
+                                                <p key={idx} className="text-sm text-gray-900">{p.name} - {p.phone}</p>
+                                            ))
+                                        )}
                                     </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">To</span>
-                                        <span className="font-medium">{selectedBooking.toCity || 'N/A'}</span>
+                                    <div className="border border-gray-200 rounded-lg p-3">
+                                        <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                                            <MapPin className="w-4 h-4 text-blue-600" />
+                                            Route Details
+                                        </h4>
+                                        <p className="text-sm font-medium text-gray-900">{selectedBooking.mainRoute || 'N/A'}</p>
+                                        {(selectedBooking.passengerDetails || []).length > 0 && (
+                                            <div className="mt-2 pt-2 border-t border-gray-100">
+                                                {selectedBooking.passengerDetails.map((p, idx) => (
+                                                    <p key={idx} className="text-xs text-gray-500">{p.route}</p>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            </div>
-
-                            {/* Customer & Driver Details */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div className="border border-gray-200 rounded-lg p-3">
-                                    <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
-                                        <User className="w-4 h-4" />
-                                        Customer Details
-                                    </h4>
-                                    <div className="space-y-1">
+                                </>
+                            ) : (
+                                <>
+                                    <div className="border border-gray-200 rounded-lg p-3">
+                                        <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                                            <User className="w-4 h-4" />
+                                            Customer Details
+                                        </h4>
                                         <p className="text-sm"><span className="text-gray-500">Name:</span> {selectedBooking.customer?.name || 'N/A'}</p>
                                         <p className="text-sm"><span className="text-gray-500">Phone:</span> {selectedBooking.customer?.phone || 'N/A'}</p>
                                     </div>
-                                </div>
-                                <div className="border border-gray-200 rounded-lg p-3">
-                                    <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
-                                        <User className="w-4 h-4" />
-                                        Driver Details
-                                    </h4>
-                                    <div className="space-y-1">
-                                        <p className="text-sm"><span className="text-gray-500">Name:</span> {selectedBooking.driver?.name || 'Not assigned'}</p>
-                                        <p className="text-sm"><span className="text-gray-500">Phone:</span> {selectedBooking.driver?.phone || 'N/A'}</p>
+                                    <div className="border border-gray-200 rounded-lg p-3">
+                                        <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                                            <MapPin className="w-4 h-4 text-blue-600" />
+                                            Route Details
+                                        </h4>
+                                        <p className="text-sm text-gray-600">{selectedBooking.fromCity || 'N/A'} → {selectedBooking.toCity || 'N/A'}</p>
                                     </div>
+                                </>
+                            )}
+
+                            {/* Driver Details */}
+                            <div className="border border-gray-200 rounded-lg p-3">
+                                <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                                    <User className="w-4 h-4" />
+                                    Driver Details
+                                </h4>
+                                <div className="space-y-1">
+                                    <p className="text-sm"><span className="text-gray-500">Name:</span> {selectedBooking.driver?.name || 'Not assigned'}</p>
+                                    <p className="text-sm"><span className="text-gray-500">Phone:</span> {selectedBooking.driver?.phone || 'N/A'}</p>
                                 </div>
                             </div>
 
@@ -590,6 +720,81 @@ function AllBookings() {
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Cancel Confirmation Modal */}
+            {showCancelModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-md w-full">
+                        <div className="border-b border-gray-100 p-4 flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5 text-red-500" />
+                                <h3 className="text-lg font-bold text-gray-900">Cancel Booking</h3>
+                            </div>
+                            <button 
+                                onClick={() => {
+                                    setShowCancelModal(false);
+                                    setCancelReason('');
+                                    setCancelBookingId(null);
+                                }} 
+                                className="p-1 hover:bg-gray-100 rounded-lg"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        
+                        <div className="p-5 space-y-4">
+                            <div className="bg-red-50 rounded-lg p-3 border border-red-100">
+                                <p className="text-sm text-red-700">
+                                    Are you sure you want to cancel this booking? This action cannot be undone.
+                                </p>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Reason for Cancellation <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    value={cancelReason}
+                                    onChange={(e) => setCancelReason(e.target.value)}
+                                    placeholder="Please provide a reason for cancelling this booking..."
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+                                    rows="3"
+                                />
+                            </div>
+                            
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => {
+                                        setShowCancelModal(false);
+                                        setCancelReason('');
+                                        setCancelBookingId(null);
+                                    }}
+                                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+                                >
+                                    No, Keep Booking
+                                </button>
+                                <button
+                                    onClick={handleCancelBooking}
+                                    disabled={cancelling || !cancelReason.trim()}
+                                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {cancelling ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                            Cancelling...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <XCircle className="w-4 h-4" />
+                                            Yes, Cancel Booking
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

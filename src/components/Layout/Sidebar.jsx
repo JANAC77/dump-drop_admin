@@ -35,16 +35,16 @@ const menuItems = [
     items: [
       { path: '/cab-rides', name: 'Cab Rides', icon: Car },
       { path: '/goods-delivery', name: 'Goods Delivery', icon: Package },
-      { path: '/all-rides', name: 'All Rides', icon: ClipboardList },
-      { path: '/all-bookings', name: 'All Bookings', icon: Calendar },
+    //  { path: '/all-rides', name: 'All Rides', icon: ClipboardList },
       { path: '/rentals', name: 'Vehicle Rentals', icon: Calendar },
     ]
   },
   {
     category: "BOOKING & CANCELLATION",
     items: [
-      { path: '/cancellation-requests', name: 'Cancellation Requests', icon: XCircle },
-      { path: '/cancelled-orders', name: 'Cancelled Orders', icon: AlertCircle },
+     // { path: '/cancellation-requests', name: 'Cancellation Requests', icon: XCircle },
+     // { path: '/cancelled-orders', name: 'Cancelled Orders', icon: AlertCircle },
+      { path: '/all-bookings', name: 'All Bookings', icon: Calendar },
       { path: '/cancelled-rides', name: 'Cancelled Rides', icon: XCircle },
     ]
   },
@@ -55,7 +55,7 @@ const menuItems = [
       { path: '/payments', name: 'Payments', icon: CreditCard },
 
       { path: '/payouts', name: 'Payouts', icon: CreditCard },
-      { path: '/revenue', name: 'Revenue Reports', icon: TrendingUp },
+    //  { path: '/revenue', name: 'Revenue Reports', icon: TrendingUp },
       { path: '/revenue-reports', name: 'Revenue Analytics', icon: TrendingUp },
     ]
   },
@@ -67,19 +67,19 @@ const menuItems = [
       { path: '/driver-verification', name: 'Driver Verification', icon: Shield },
     ]
   },
-  {
-    category: "VEHICLE MANAGEMENT",
-    items: [
-      { path: '/vehicles', name: 'Vehicle Types', icon: Truck },
-      { path: '/vehicle-rates', name: 'Rate Management', icon: TrendingUp },
-    ]
-  },
+  // {
+  //   category: "VEHICLE MANAGEMENT",
+  //   items: [
+  //     { path: '/vehicles', name: 'Vehicle Types', icon: Truck },
+  //     { path: '/vehicle-rates', name: 'Rate Management', icon: TrendingUp },
+  //   ]
+  // },
   {
     category: "SYSTEM",
     items: [
       { path: '/reports', name: 'Reports', icon: FileText },
       { path: '/notifications', name: 'Notifications', icon: Bell },
-      { path: '/settings', name: 'Settings', icon: Settings },
+   //   { path: '/settings', name: 'Settings', icon: Settings },
     ]
   },
 ];
