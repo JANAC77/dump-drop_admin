@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Eye, CheckCircle, XCircle, User, Star, Car, Clock, Download, RefreshCw, Users, UserCheck, UserX, TrendingUp, X } from 'lucide-react';
+import { Search, Eye, CheckCircle, XCircle, User, Car, Clock, Download, RefreshCw, Users, UserCheck, UserX, TrendingUp, X } from 'lucide-react';
 import { adminAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import autoTable from "jspdf-autotable";
+
+// Helper function for full number format - NO abbreviations, just plain number
+const formatFullNumber = (amount) => {
+  if (!amount || amount === 0) return '₹0';
+  const num = Math.round(amount || 0);
+  return `₹${num.toLocaleString('en-IN')}`;
+};
 
 function Drivers() {
   const navigate = useNavigate();
@@ -12,7 +19,7 @@ function Drivers() {
   const [filteredDrivers, setFilteredDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('approved');
 
   useEffect(() => {
     fetchDrivers();
@@ -27,7 +34,7 @@ function Drivers() {
     try {
       const response = await adminAPI.getDrivers();
       console.log('Drivers API Response:', response);
-      
+
       let driversData = [];
       if (response.data?.drivers) {
         driversData = response.data.drivers;
@@ -38,12 +45,10 @@ function Drivers() {
       } else if (response.data?.data && Array.isArray(response.data.data)) {
         driversData = response.data.data;
       }
-      
-      // Process drivers to get phone from populated userId
+
       const processedDrivers = driversData.map(driver => {
-        // Try to get phone from multiple possible locations
         let phoneNumber = 'N/A';
-        
+
         if (driver.phone) {
           phoneNumber = driver.phone;
         } else if (driver.userId?.phone) {
@@ -53,23 +58,25 @@ function Drivers() {
         } else if (driver.userPhone) {
           phoneNumber = driver.userPhone;
         }
-        
-        // Also get name properly
+
         let displayName = driver.fullName || driver.name || 'N/A';
         if (driver.userId?.name && driver.userId.name !== displayName) {
           displayName = driver.userId.name;
         }
-        
+
         return {
           ...driver,
           displayPhone: phoneNumber,
           displayName: displayName
         };
       });
-      
+
+      const approvedDrivers = processedDrivers.filter(driver => driver.status === 'approved');
+
       console.log('Processed drivers with phone:', processedDrivers);
+      console.log('Approved drivers only:', approvedDrivers);
       setDrivers(processedDrivers);
-      setFilteredDrivers(processedDrivers);
+      setFilteredDrivers(approvedDrivers);
     } catch (error) {
       console.error('Error fetching drivers:', error);
       toast.error('Failed to load drivers');
@@ -113,13 +120,13 @@ function Drivers() {
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(12);
     doc.text("Statistics Summary", 14, 35);
-    
+
     const statsData = [
       ["Total Drivers", stats.total],
       ["Approved Drivers", stats.approved],
       ["Pending Drivers", stats.pending],
       ["Rejected Drivers", stats.rejected],
-      ["Total Earnings", `${stats.totalEarnings.toLocaleString()}`],
+      ["Total Earnings", `${Math.round(stats.totalEarnings).toLocaleString('en-IN')}`],
       ["Total Rides", stats.totalRides],
     ];
 
@@ -142,7 +149,7 @@ function Drivers() {
       driver.regNumber || 'N/A',
       driver.status || 'N/A',
       driver.totalRides || 0,
-      `${(driver.totalEarnings || 0).toLocaleString()}`,
+      `${Math.round(driver.totalEarnings || 0).toLocaleString('en-IN')}`,
     ]);
 
     autoTable(doc, {
@@ -190,12 +197,12 @@ function Drivers() {
   };
 
   const stats = {
-    total: filteredDrivers.length,
-    approved: filteredDrivers.filter(d => d.status === 'approved').length,
-    pending: filteredDrivers.filter(d => d.status === 'pending').length,
-    rejected: filteredDrivers.filter(d => d.status === 'rejected').length,
-    totalEarnings: filteredDrivers.reduce((sum, d) => sum + (d.totalEarnings || 0), 0),
-    totalRides: filteredDrivers.reduce((sum, d) => sum + (d.totalRides || 0), 0)
+    total: drivers.length,
+    approved: drivers.filter(d => d.status === 'approved').length,
+    pending: drivers.filter(d => d.status === 'pending').length,
+    rejected: drivers.filter(d => d.status === 'rejected').length,
+    totalEarnings: drivers.reduce((sum, d) => sum + (d.totalEarnings || 0), 0),
+    totalRides: drivers.reduce((sum, d) => sum + (d.totalRides || 0), 0)
   };
 
   if (loading) {
@@ -208,31 +215,23 @@ function Drivers() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Drivers</h1>
           <p className="text-sm text-gray-500 mt-1">Manage all registered drivers</p>
         </div>
         <div className="flex gap-3">
-          <button
-            onClick={exportToPDF}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
-          >
+          <button onClick={exportToPDF} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2">
             <Download className="w-4 h-4" />
             Export PDF
           </button>
-          <button
-            onClick={fetchDrivers}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center gap-2"
-          >
+          <button onClick={fetchDrivers} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center gap-2">
             <RefreshCw className="w-4 h-4" />
             Refresh
           </button>
         </div>
       </div>
 
-      {/* Dashboard Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
         <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-blue-500">
           <div className="flex items-center justify-between">
@@ -260,7 +259,7 @@ function Drivers() {
         </div>
         <div className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-purple-500">
           <div className="flex items-center justify-between">
-            <div><p className="text-2xl font-bold text-purple-600">₹{stats.totalEarnings.toLocaleString()}</p><p className="text-xs text-gray-500">Total Earnings</p></div>
+            <div><p className="text-2xl font-bold text-purple-600">{formatFullNumber(stats.totalEarnings)}</p><p className="text-xs text-gray-500">Total Earnings</p></div>
             <TrendingUp className="w-8 h-8 text-purple-200" />
           </div>
         </div>
@@ -272,7 +271,6 @@ function Drivers() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4">
         <div className="flex flex-wrap gap-4 items-center">
           <div className="relative flex-1 min-w-[250px]">
@@ -296,17 +294,13 @@ function Drivers() {
             <option value="rejected">Rejected</option>
           </select>
           {(searchTerm || statusFilter !== 'all') && (
-            <button
-              onClick={() => { setSearchTerm(''); setStatusFilter('all'); }}
-              className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium flex items-center gap-1"
-            >
+            <button onClick={() => { setSearchTerm(''); setStatusFilter('approved'); }} className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium flex items-center gap-1">
               <X className="w-4 h-4" /> Clear
             </button>
           )}
         </div>
       </div>
 
-      {/* Drivers Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredDrivers.length === 0 ? (
           <div className="col-span-full text-center py-12 text-gray-500">No drivers found</div>
@@ -314,25 +308,18 @@ function Drivers() {
           filteredDrivers.map((driver) => {
             const statusBadge = getStatusBadge(driver.status);
             const StatusIcon = statusBadge.icon;
-            
+
             return (
-              <div 
-                key={driver._id} 
-                className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition cursor-pointer" 
-                onClick={() => handleViewDriver(driver)}
-              >
+              <div key={driver._id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition cursor-pointer" onClick={() => handleViewDriver(driver)}>
                 <div className="p-5">
-                  {/* Header with Avatar, Name, and Status */}
                   <div className="flex items-center gap-4 mb-4">
                     <div className="w-14 h-14 bg-gradient-to-r from-purple-100 to-pink-100 rounded-full flex items-center justify-center">
                       <User className="w-7 h-7 text-purple-600" />
                     </div>
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-900">{driver.displayName}</h3>
-                      <div className="flex items-center gap-1 mt-1">
-                        <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                        <span className="text-sm text-gray-600">{driver.rating || 4.5}</span>
-                        <span className="text-xs text-gray-400">• {driver.totalRides || 0} rides</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-sm text-gray-600">{driver.totalRides || 0} rides</span>
                       </div>
                     </div>
                     <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusBadge.color}`}>
@@ -340,8 +327,7 @@ function Drivers() {
                       {statusBadge.text}
                     </div>
                   </div>
-                  
-                  {/* Vehicle Basic Info */}
+
                   <div className="pt-2 pb-3">
                     <p className="text-sm text-gray-600 flex items-center gap-2">
                       <Car className="w-4 h-4 text-gray-400" />
@@ -351,20 +337,13 @@ function Drivers() {
                       <span className="font-medium">📞</span> {driver.displayPhone}
                     </p>
                   </div>
-                  
-                  {/* Footer with Earnings and View Button */}
+
                   <div className="flex items-center justify-between mt-2 pt-3 border-t border-gray-100">
                     <div>
                       <p className="text-xs text-gray-500">Total Earnings</p>
-                      <p className="text-lg font-bold text-gray-900">₹{(driver.totalEarnings || 0).toLocaleString()}</p>
+                      <p className="text-lg font-bold text-gray-900">{formatFullNumber(driver.totalEarnings || 0)}</p>
                     </div>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleViewDriver(driver);
-                      }}
-                      className="px-3 py-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-sm font-medium transition flex items-center gap-1"
-                    >
+                    <button onClick={(e) => { e.stopPropagation(); handleViewDriver(driver); }} className="px-3 py-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-sm font-medium transition flex items-center gap-1">
                       <Eye className="w-4 h-4" />
                       View Details
                     </button>

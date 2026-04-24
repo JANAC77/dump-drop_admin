@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Package, Truck, Eye, XCircle, CheckCircle, Clock, Download, RefreshCw } from 'lucide-react';
+import { Search, Package, Truck, Eye, XCircle, CheckCircle, Clock, Download, RefreshCw, User, MapPin, DollarSign } from 'lucide-react';
 import { adminAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
@@ -10,6 +10,8 @@ function GoodsDelivery() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedDelivery, setSelectedDelivery] = useState(null);
+  const [showViewModal, setShowViewModal] = useState(false);
 
   useEffect(() => {
     fetchDeliveries();
@@ -60,7 +62,6 @@ function GoodsDelivery() {
     let startY = 30;
 
     const statsData = [
-      ["Draft", stats.draft],
       ["Searching", stats.searching],
       ["Available", stats.available],
       ["Accepted", stats.accepted],
@@ -82,6 +83,7 @@ function GoodsDelivery() {
     const tableData = filteredDeliveries.map((d) => [
       `#${d._id?.slice(-5) || "N/A"}`,
       `${getCustomerName(d)}\n${getCustomerPhone(d)}`,
+      `${getDriverName(d)}\n${getDriverPhone(d)}`,
       `${getFromLocation(d)}\n→\n${getToLocation(d)}`,
       `${getVehicleType(d)}\n${getGoodsType(d)}\n${getGoodsWeight(d)}`,
       `₹${getFare(d)}`,
@@ -90,18 +92,19 @@ function GoodsDelivery() {
 
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 10,
-      head: [["ID", "Customer / Mobile", "Pickup → Drop", "Vehicle / Goods", "Amount", "Status"]],
+      head: [["ID", "Customer / Mobile", "Driver / Mobile", "Pickup → Drop", "Vehicle / Goods", "Amount", "Status"]],
       body: tableData,
       theme: "striped",
       styles: { fontSize: 8, cellPadding: 3, valign: "middle" },
       headStyles: { fillColor: [41, 128, 185], textColor: 255, halign: "center", fontStyle: "bold" },
       columnStyles: {
-        0: { cellWidth: 20 },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 50 },
-        3: { cellWidth: 40 },
-        4: { cellWidth: 20, halign: "right" },
-        5: { cellWidth: 20, halign: "center" },
+        0: { cellWidth: 18 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 35 },
+        3: { cellWidth: 45 },
+        4: { cellWidth: 35 },
+        5: { cellWidth: 18, halign: "right" },
+        6: { cellWidth: 18, halign: "center" },
       },
       didDrawPage: () => {
         doc.setFontSize(8);
@@ -116,7 +119,6 @@ function GoodsDelivery() {
 
   const getStatusLabel = (status) => {
     const statusConfig = {
-      draft: 'Draft',
       searching: 'Searching',
       available: 'Available',
       accepted: 'Accepted',
@@ -129,7 +131,6 @@ function GoodsDelivery() {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      draft: { color: 'bg-gray-100 text-gray-700', icon: Clock, label: 'Draft' },
       searching: { color: 'bg-yellow-100 text-yellow-700', icon: Clock, label: 'Searching' },
       available: { color: 'bg-blue-100 text-blue-700', icon: Truck, label: 'Available' },
       accepted: { color: 'bg-cyan-100 text-cyan-700', icon: CheckCircle, label: 'Accepted' },
@@ -147,7 +148,6 @@ function GoodsDelivery() {
     );
   };
 
-  // Safely get customer name
   const getCustomerName = (delivery) => {
     if (delivery.customer?.name) return delivery.customer.name;
     if (delivery.customerName) return delivery.customerName;
@@ -155,7 +155,6 @@ function GoodsDelivery() {
     return 'N/A';
   };
 
-  // Safely get customer phone
   const getCustomerPhone = (delivery) => {
     if (delivery.customer?.phone) return delivery.customer.phone;
     if (delivery.customerPhone) return delivery.customerPhone;
@@ -163,34 +162,28 @@ function GoodsDelivery() {
     return '';
   };
 
-  // Safely get from location
   const getFromLocation = (delivery) => {
     return delivery.from || delivery.fromCity || delivery.pickupLocation?.address || 'N/A';
   };
 
-  // Safely get to location
   const getToLocation = (delivery) => {
     return delivery.to || delivery.toCity || delivery.dropLocation?.address || 'N/A';
   };
 
-  // Safely get fare
   const getFare = (delivery) => {
     return delivery.fare || delivery.price || delivery.amount || 0;
   };
 
-  // Get vehicle type from existing field
   const getVehicleType = (delivery) => {
     return delivery.vehicleType || delivery.carModel || 'N/A';
   };
 
-  // Get goods type from goods object
   const getGoodsType = (delivery) => {
     if (delivery.goods?.type) return delivery.goods.type;
     if (delivery.packageType) return delivery.packageType;
     return 'N/A';
   };
 
-  // Get goods weight from goods object
   const getGoodsWeight = (delivery) => {
     if (delivery.goods?.weight) return delivery.goods.weight;
     if (delivery.weight) return `${delivery.weight}`;
@@ -198,11 +191,27 @@ function GoodsDelivery() {
     return 'N/A';
   };
 
+  const getDriverName = (delivery) => {
+    if (delivery.driverId?.name) return delivery.driverId.name;
+    if (delivery.driver?.name) return delivery.driver.name;
+    if (delivery.driverName) return delivery.driverName;
+    return 'Not assigned';
+  };
+
+  const getDriverPhone = (delivery) => {
+    if (delivery.driverId?.phone) return delivery.driverId.phone;
+    if (delivery.driver?.phone) return delivery.driver.phone;
+    if (delivery.driverPhone) return delivery.driverPhone;
+    return '';
+  };
+
   const filteredDeliveries = deliveries.filter(delivery => {
     const searchLower = searchTerm.toLowerCase();
     return (
       getCustomerName(delivery).toLowerCase().includes(searchLower) ||
       getCustomerPhone(delivery).toLowerCase().includes(searchLower) ||
+      getDriverName(delivery).toLowerCase().includes(searchLower) ||
+      getDriverPhone(delivery).toLowerCase().includes(searchLower) ||
       getFromLocation(delivery).toLowerCase().includes(searchLower) ||
       getToLocation(delivery).toLowerCase().includes(searchLower) ||
       getVehicleType(delivery).toLowerCase().includes(searchLower) ||
@@ -211,7 +220,6 @@ function GoodsDelivery() {
   });
 
   const stats = {
-    draft: deliveries.filter(d => d.status?.toLowerCase() === 'draft').length,
     searching: deliveries.filter(d => d.status?.toLowerCase() === 'searching').length,
     available: deliveries.filter(d => d.status?.toLowerCase() === 'available').length,
     accepted: deliveries.filter(d => d.status?.toLowerCase() === 'accepted').length,
@@ -241,7 +249,7 @@ function GoodsDelivery() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by customer, vehicle, goods..."
+              placeholder="Search by customer, driver, vehicle, goods..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
@@ -253,7 +261,6 @@ function GoodsDelivery() {
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Status</option>
-            <option value="draft">Draft</option>
             <option value="searching">Searching</option>
             <option value="available">Available</option>
             <option value="accepted">Accepted</option>
@@ -278,12 +285,8 @@ function GoodsDelivery() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
-        <div className="bg-white rounded-xl p-3 shadow-sm text-center">
-          <p className="text-xl font-bold text-gray-600">{stats.draft}</p>
-          <p className="text-xs text-gray-500">Draft</p>
-        </div>
+      {/* Stats Cards - Removed Draft */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
         <div className="bg-white rounded-xl p-3 shadow-sm text-center">
           <p className="text-xl font-bold text-yellow-600">{stats.searching}</p>
           <p className="text-xs text-gray-500">Searching</p>
@@ -321,23 +324,26 @@ function GoodsDelivery() {
         </div>
       </div>
 
+      {/* Main Table - Added Driver Column */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[900px]">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer / Mobile</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Driver / Mobile</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pickup → Drop</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle / Goods</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredDeliveries.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-5 py-10 text-center text-gray-500">
+                  <td colSpan="8" className="px-5 py-10 text-center text-gray-500">
                     No deliveries found
                   </td>
                 </tr>
@@ -351,6 +357,12 @@ function GoodsDelivery() {
                       <div>
                         <p className="text-sm font-medium text-gray-900">{getCustomerName(delivery)}</p>
                         <p className="text-xs text-gray-500">{getCustomerPhone(delivery)}</p>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{getDriverName(delivery)}</p>
+                        <p className="text-xs text-gray-500">{getDriverPhone(delivery)}</p>
                       </div>
                     </td>
                     <td className="px-5 py-3">
@@ -368,6 +380,18 @@ function GoodsDelivery() {
                     </td>
                     <td className="px-5 py-3 text-sm font-semibold text-gray-900">₹{getFare(delivery)}</td>
                     <td className="px-5 py-3">{getStatusBadge(delivery.status)}</td>
+                    <td className="px-5 py-3">
+                      <button
+                        onClick={() => {
+                          setSelectedDelivery(delivery);
+                          setShowViewModal(true);
+                        }}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        title="View Details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -375,6 +399,91 @@ function GoodsDelivery() {
           </table>
         </div>
       </div>
+
+      {/* View Details Modal */}
+      {showViewModal && selectedDelivery && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-100 p-5 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-900">Delivery Details</h3>
+              <button onClick={() => setShowViewModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Delivery Header */}
+              <div className="bg-gradient-to-r from-green-600 to-emerald-500 rounded-xl p-4 text-white">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-white/80">Order ID</p>
+                    <p className="text-base font-bold">#{selectedDelivery._id?.slice(-8)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-white/80">Status</p>
+                    {getStatusBadge(selectedDelivery.status)}
+                  </div>
+                  <div>
+                    <p className="text-xs text-white/80">Date & Time</p>
+                    <p className="text-xs">{new Date(selectedDelivery.createdAt || selectedDelivery.date).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-white/80">Amount</p>
+                    <p className="text-base font-bold">₹{getFare(selectedDelivery)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Customer Details */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Customer Details
+                </h4>
+                <div className="space-y-1">
+                  <p className="text-sm"><span className="text-gray-500">Name:</span> {getCustomerName(selectedDelivery)}</p>
+                  <p className="text-sm"><span className="text-gray-500">Phone:</span> {getCustomerPhone(selectedDelivery) || 'N/A'}</p>
+                </div>
+              </div>
+
+              {/* Driver Details */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Driver Details
+                </h4>
+                <div className="space-y-1">
+                  <p className="text-sm"><span className="text-gray-500">Name:</span> {getDriverName(selectedDelivery)}</p>
+                  <p className="text-sm"><span className="text-gray-500">Phone:</span> {getDriverPhone(selectedDelivery) || 'N/A'}</p>
+                </div>
+              </div>
+
+              {/* Route Details */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-blue-600" />
+                  Route Details
+                </h4>
+                <p className="text-sm text-gray-600">Pickup: {getFromLocation(selectedDelivery)}</p>
+                <p className="text-sm text-gray-600">Drop: {getToLocation(selectedDelivery)}</p>
+              </div>
+
+              {/* Goods Details */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                  <Package className="w-4 h-4 text-orange-600" />
+                  Goods Details
+                </h4>
+                <div className="space-y-1">
+                  <p className="text-sm"><span className="text-gray-500">Vehicle Type:</span> {getVehicleType(selectedDelivery)}</p>
+                  <p className="text-sm"><span className="text-gray-500">Goods Type:</span> {getGoodsType(selectedDelivery)}</p>
+                  <p className="text-sm"><span className="text-gray-500">Weight:</span> {getGoodsWeight(selectedDelivery)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ function CabRides() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedRide, setSelectedRide] = useState(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
@@ -21,9 +22,9 @@ function CabRides() {
   const fetchRides = async () => {
     setLoading(true);
     try {
-      const response = await adminAPI.getRides(1, 500, { 
-        type: 'cab', 
-        status: statusFilter !== 'all' ? statusFilter : undefined 
+      const response = await adminAPI.getRides(1, 500, {
+        type: 'cab',
+        status: statusFilter !== 'all' ? statusFilter : undefined
       });
 
       let ridesData = [];
@@ -76,6 +77,10 @@ function CabRides() {
 
     const statsData = [
       ["Total Rides", filteredRides.length],
+      ["Searching", stats.searching],
+      ["Available", stats.available],
+      ["Accepted", stats.accepted],
+      ["Ongoing", stats.ongoing],
       ["Completed", stats.completed],
       ["Cancelled", stats.cancelled],
       ["Revenue", `${stats.totalAmount.toFixed(1)}`],
@@ -133,7 +138,6 @@ function CabRides() {
 
   const getStatusLabel = (status) => {
     const statusConfig = {
-      draft: 'Draft',
       searching: 'Searching',
       available: 'Available',
       accepted: 'Accepted',
@@ -146,7 +150,6 @@ function CabRides() {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      draft: { color: 'bg-gray-100 text-gray-700', icon: Clock, label: 'Draft' },
       searching: { color: 'bg-yellow-100 text-yellow-700', icon: Clock, label: 'Searching' },
       available: { color: 'bg-blue-100 text-blue-700', icon: Clock, label: 'Available' },
       accepted: { color: 'bg-cyan-100 text-cyan-700', icon: Clock, label: 'Accepted' },
@@ -164,21 +167,20 @@ function CabRides() {
     );
   };
 
-  // Get all passenger names as array
   const getAllPassengerNames = (ride) => {
     let allNames = [];
     let processedNames = new Set();
-    
+
     let mainCustomerName = null;
     if (ride.customerId?.name) mainCustomerName = ride.customerId.name;
     else if (ride.customer?.name) mainCustomerName = ride.customer.name;
     else if (ride.customerName) mainCustomerName = ride.customerName;
-    
+
     if (mainCustomerName && !processedNames.has(mainCustomerName)) {
       processedNames.add(mainCustomerName);
       allNames.push(mainCustomerName);
     }
-    
+
     if (ride.bookings && ride.bookings.length > 0) {
       ride.bookings.forEach(booking => {
         const name = booking.customerName;
@@ -188,7 +190,7 @@ function CabRides() {
         }
       });
     }
-    
+
     if (ride.bookedPassengers && ride.bookedPassengers.length > 0) {
       ride.bookedPassengers.forEach(p => {
         let name = null;
@@ -203,15 +205,14 @@ function CabRides() {
         }
       });
     }
-    
+
     if (allNames.length === 0) return ['No passengers'];
     return allNames;
   };
 
-  // Get individual routes as array
   const getIndividualRoutesArray = (ride) => {
     let routes = [];
-    
+
     if (ride.bookings && ride.bookings.length > 0) {
       ride.bookings.forEach(booking => {
         if (booking.fromCity && booking.toCity && booking.fromCity !== booking.toCity) {
@@ -222,7 +223,7 @@ function CabRides() {
         }
       });
     }
-    
+
     if (routes.length === 0 && ride.segments && ride.segments.length > 0) {
       ride.segments.forEach(segment => {
         if (segment.fromCity && segment.toCity && segment.fromCity !== segment.toCity) {
@@ -233,12 +234,11 @@ function CabRides() {
         }
       });
     }
-    
+
     if (routes.length === 0) return ['-'];
     return routes;
   };
 
-  // Get main route
   const getMainRoute = (ride) => {
     if (ride.segments && ride.segments.length > 0) {
       const firstSegment = ride.segments[0];
@@ -248,19 +248,19 @@ function CabRides() {
         return `${firstSegment.fromCity} -> ${lastSegment.toCity}`;
       }
     }
-    
+
     if (ride.routeMajorCities && ride.routeMajorCities.length >= 2) {
       const first = ride.routeMajorCities[0];
       const last = ride.routeMajorCities[ride.routeMajorCities.length - 1];
       if (first === last) return first;
       return `${first} -> ${last}`;
     }
-    
+
     if (ride.fromCity && ride.toCity) {
       if (ride.fromCity === ride.toCity) return ride.fromCity;
       return `${ride.fromCity} -> ${ride.toCity}`;
     }
-    
+
     return 'N/A';
   };
 
@@ -301,7 +301,6 @@ function CabRides() {
   });
 
   const stats = {
-    draft: rides.filter(r => r.status?.toLowerCase() === 'draft').length,
     searching: rides.filter(r => r.status?.toLowerCase() === 'searching').length,
     available: rides.filter(r => r.status?.toLowerCase() === 'available').length,
     accepted: rides.filter(r => r.status?.toLowerCase() === 'accepted').length,
@@ -343,7 +342,6 @@ function CabRides() {
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Status</option>
-            <option value="draft">Draft</option>
             <option value="searching">Searching</option>
             <option value="available">Available</option>
             <option value="accepted">Accepted</option>
@@ -368,12 +366,8 @@ function CabRides() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
-        <div className="bg-white rounded-xl p-3 shadow-sm text-center">
-          <p className="text-xl font-bold text-gray-600">{stats.draft}</p>
-          <p className="text-xs text-gray-500">Draft</p>
-        </div>
+      {/* Stats Cards - 6 cards (Draft removed) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
         <div className="bg-white rounded-xl p-3 shadow-sm text-center">
           <p className="text-xl font-bold text-yellow-600">{stats.searching}</p>
           <p className="text-xs text-gray-500">Searching</p>
@@ -414,7 +408,7 @@ function CabRides() {
       {/* Main Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px]">
+          <table className="w-full min-w-[1200px]">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ride ID</th>
@@ -425,12 +419,13 @@ function CabRides() {
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Driver</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredRides.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-5 py-10 text-center text-gray-500">
+                  <td colSpan="9" className="px-5 py-10 text-center text-gray-500">
                     No rides found
                   </td>
                 </tr>
@@ -483,6 +478,32 @@ function CabRides() {
                       <td className="px-5 py-3 align-top">
                         {getStatusBadge(ride.status)}
                       </td>
+                      <td className="px-5 py-3 align-top">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedRide(ride);
+                              setShowViewModal(true);
+                            }}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          {ride.status !== 'cancelled' && ride.status !== 'completed' && (
+                            <button
+                              onClick={() => {
+                                setSelectedRide(ride);
+                                setShowCancelModal(true);
+                              }}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
+                              title="Cancel Ride"
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   );
                 })
@@ -492,11 +513,90 @@ function CabRides() {
         </div>
       </div>
 
-      {showCancelModal && (
+      {/* View Details Modal */}
+      {showViewModal && selectedRide && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-100 p-5 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-900">Ride Details</h3>
+              <button onClick={() => setShowViewModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Ride Header */}
+              <div className="bg-gradient-to-r from-blue-600 to-cyan-500 rounded-xl p-4 text-white">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-white/80">Ride ID</p>
+                    <p className="text-base font-bold">#{selectedRide._id?.slice(-8)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-white/80">Status</p>
+                    {getStatusBadge(selectedRide.status)}
+                  </div>
+                  <div>
+                    <p className="text-xs text-white/80">Date & Time</p>
+                    <p className="text-xs">{new Date(getRideDate(selectedRide)).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-white/80">Amount</p>
+                    <p className="text-base font-bold">₹{getFare(selectedRide).toFixed(1)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Passengers */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Passengers
+                </h4>
+                {getAllPassengerNames(selectedRide).map((name, idx) => (
+                  <p key={idx} className="text-sm text-gray-900">{name}</p>
+                ))}
+              </div>
+
+              {/* Route Details */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-blue-600" />
+                  Route Details
+                </h4>
+                <p className="text-sm font-medium text-gray-900">Main Route: {getMainRoute(selectedRide)}</p>
+                {getIndividualRoutesArray(selectedRide).length > 0 && getIndividualRoutesArray(selectedRide)[0] !== '-' && (
+                  <div className="mt-2 pt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-500">Individual Routes:</p>
+                    {getIndividualRoutesArray(selectedRide).map((route, idx) => (
+                      <p key={idx} className="text-xs text-gray-600">{route}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Driver Details */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Driver Details
+                </h4>
+                <div className="space-y-1">
+                  <p className="text-sm"><span className="text-gray-500">Name:</span> {getDriverName(selectedRide)}</p>
+                  <p className="text-sm"><span className="text-gray-500">Phone:</span> {getDriverPhone(selectedRide) || 'N/A'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Modal */}
+      {showCancelModal && selectedRide && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Cancel Ride</h3>
-            <p className="text-sm text-gray-600 mb-3">Ride ID: #{selectedRide?._id?.slice(-6)}</p>
+            <p className="text-sm text-gray-600 mb-3">Ride ID: #{selectedRide._id?.slice(-6)}</p>
             <p className="text-sm text-gray-600 mb-3">Passengers: {getAllPassengerNames(selectedRide).join(', ')}</p>
             <textarea
               value={cancelReason}

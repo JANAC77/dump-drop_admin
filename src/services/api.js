@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Use localhost for development, change to your backend IP if needed
-const API_BASE_URL = 'https://dump-and-drop.onrender.com/api/admin';
+const API_BASE_URL = 'http://localhost:5000/api/admin';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -38,10 +38,8 @@ export const adminAPI = {
   // Auth
   adminLogin: (email, password) => api.post('/login', { email, password }),
 
-  // Dashboard
   getDashboardStats: () => api.get('/dashboard/stats'),
   getRevenueData: (period) => api.get(`/dashboard/revenue?period=${period}`),
-
   // Users
   getUsers: (page = 1, limit = 10, search = '') =>
     api.get('/users', { params: { page, limit, search } }),
@@ -62,10 +60,10 @@ export const adminAPI = {
   getRides: (page = 1, limit = 10, filters = {}) =>
     api.get('/rides', { params: { page, limit, ...filters } }),
   cancelRide: (rideId, reason) => api.put(`/rides/${rideId}/cancel`, { reason }),
-// Commission
-getCommissionSettings: () => api.get('/commission'),
-updateCommissionSettings: (settings) => api.put('/commission', settings),
-getDriverCommission: () => api.get('/commission/driver'),
+  // Commission
+  getCommissionSettings: () => api.get('/commission'),
+  updateCommissionSettings: (settings) => api.put('/commission', settings),
+  getDriverCommission: () => api.get('/commission/driver'),
   // Settings
   getSettings: () => api.get('/settings'),
   updateSettings: (settings) => api.put('/settings', settings),
@@ -138,12 +136,10 @@ getDriverCommission: () => api.get('/commission/driver'),
     });
   },
 
-  // Revenue Reports
   getRevenueReports: (period) => api.get(`/revenue-reports?period=${period}`),
   exportRevenueReport: (period) => api.get(`/reports/revenue/export?period=${period}`, {
     responseType: 'blob'
   }),
-
   // Cancelled Rides
   getCancelledRides: (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
@@ -161,8 +157,8 @@ getDriverCommission: () => api.get('/commission/driver'),
     return api.get(`/reports/generate?type=${type}&startDate=${startDate}&endDate=${endDate}`);
   },
 
-// Rentals
-getRentalsList: () => api.get('/rentals-list'),
+  // Rentals
+  getRentalsList: () => api.get('/rentals-list'),
 
 };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Eye, User, Mail, Phone, Calendar, Download, RefreshCw, Users as UsersIcon, UserCheck, UserX, X } from 'lucide-react';
+import { Search, Eye, User, Phone, Calendar, Download, RefreshCw, Users as UsersIcon, UserCheck, UserX, X } from 'lucide-react';
 import { adminAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
@@ -26,7 +26,7 @@ function Users() {
     setLoading(true);
     try {
       const response = await adminAPI.getUsers(1, 500, searchTerm);
-      
+
       let usersData = [];
       if (response.data?.users && Array.isArray(response.data.users)) {
         usersData = response.data.users;
@@ -37,7 +37,7 @@ function Users() {
       } else if (response.data?.data && Array.isArray(response.data.data)) {
         usersData = response.data.data;
       }
-      
+
       const customersOnly = usersData.filter(user => user && user.role === 'customer');
       setUsers(customersOnly);
       setFilteredUsers(customersOnly);
@@ -55,7 +55,7 @@ function Users() {
     let filtered = [...users];
 
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(user => 
+      filtered = filtered.filter(user =>
         statusFilter === 'active' ? user.isAdminVerified !== false : user.isAdminVerified === false
       );
     }
@@ -64,8 +64,7 @@ function Users() {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(user =>
         (user.name || '').toLowerCase().includes(searchLower) ||
-        (user.phone || '').toLowerCase().includes(searchLower) ||
-        (user.email || '').toLowerCase().includes(searchLower)
+        (user.phone || '').toLowerCase().includes(searchLower)
       );
     }
 
@@ -87,7 +86,7 @@ function Users() {
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(12);
     doc.text("Statistics Summary", 14, 35);
-    
+
     const statsData = [
       ["Total Customers", stats.total],
       ["Active Customers", stats.active],
@@ -109,25 +108,23 @@ function Users() {
       i + 1,
       user.name || 'N/A',
       user.phone || 'N/A',
-      user.email || 'N/A',
       new Date(user.createdAt).toLocaleDateString(),
       user.isAdminVerified !== false ? 'Active' : 'Blocked',
     ]);
 
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 10,
-      head: [["No", "Name", "Phone", "Email", "Joined", "Status"]],
+      head: [["No", "Name", "Phone", "Joined", "Status"]],
       body: tableData,
       theme: "striped",
       styles: { fontSize: 8, cellPadding: 3 },
       headStyles: { fillColor: [41, 98, 255], textColor: 255 },
       columnStyles: {
         0: { cellWidth: 12, halign: "center" },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 30 },
-        3: { cellWidth: 50 },
+        1: { cellWidth: 50 },
+        2: { cellWidth: 35 },
+        3: { cellWidth: 35, halign: "center" },
         4: { cellWidth: 30, halign: "center" },
-        5: { cellWidth: 25, halign: "center" },
       },
       didDrawPage: () => {
         doc.setFontSize(8);
@@ -210,7 +207,7 @@ function Users() {
         <div className="flex flex-wrap gap-4 items-center">
           <div className="relative flex-1 min-w-[250px]">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" placeholder="Search by name, email or phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input type="text" placeholder="Search by name or phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
             <option value="all">All Status</option>
@@ -225,7 +222,7 @@ function Users() {
         </div>
       </div>
 
-      {/* Users Table */}
+      {/* Users Table - Email column removed */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -234,7 +231,6 @@ function Users() {
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">S.No</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
@@ -242,7 +238,7 @@ function Users() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredUsers.length === 0 ? (
-                <tr><td colSpan="7" className="px-5 py-10 text-center text-gray-500">No customers found</td></tr>
+                <tr><td colSpan="6" className="px-5 py-10 text-center text-gray-500">No customers found</td></tr>
               ) : (
                 filteredUsers.map((user, index) => (
                   <tr key={user?._id || user?.id} className="hover:bg-gray-50 transition cursor-pointer" onClick={() => handleViewUser(user)}>
@@ -254,7 +250,6 @@ function Users() {
                       </div>
                     </td>
                     <td className="px-5 py-3 text-sm text-gray-600">{user?.phone || 'N/A'}</td>
-                    <td className="px-5 py-3 text-sm text-gray-600">{user?.email || 'N/A'}</td>
                     <td className="px-5 py-3 text-sm text-gray-500">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
                     <td className="px-5 py-3">
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${user?.isAdminVerified !== false ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>

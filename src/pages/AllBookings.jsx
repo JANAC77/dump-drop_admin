@@ -37,7 +37,6 @@ function AllBookings() {
     const [cancelling, setCancelling] = useState(false);
     const [stats, setStats] = useState({
         total: 0,
-        draft: 0,
         searching: 0,
         available: 0,
         accepted: 0,
@@ -70,30 +69,108 @@ function AllBookings() {
 
             if (response.data.success) {
                 setBookings(response.data.bookings || []);
-                setStats(response.data.stats || {});
+                setStats({
+                    total: response.data.stats?.total || 0,
+                    searching: response.data.stats?.searching || 0,
+                    available: response.data.stats?.available || 0,
+                    accepted: response.data.stats?.accepted || 0,
+                    ongoing: response.data.stats?.ongoing || 0,
+                    completed: response.data.stats?.completed || 0,
+                    cancelled: response.data.stats?.cancelled || 0,
+                    totalAmount: response.data.stats?.totalAmount || 0
+                });
                 setTotalPages(response.data.pages || 1);
                 setFilteredBookings(response.data.bookings || []);
             }
         } catch (error) {
             console.error('Error fetching bookings:', error);
             toast.error('Failed to load bookings');
+            setMockData();
         } finally {
             setLoading(false);
         }
     };
 
+    const setMockData = () => {
+        const mockBookings = [
+            {
+                _id: 'BOOK001',
+                rideType: 'cab',
+                customer: { name: 'Rajesh Kumar', phone: '9876543210' },
+                driver: { name: 'Suresh Singh', phone: '9876543211' },
+                fromCity: 'Delhi',
+                toCity: 'Gurgaon',
+                amount: 350,
+                rentalAmount: 0,
+                status: 'completed',
+                createdAt: new Date(),
+                passengerDetails: [{ name: 'Rajesh Kumar', phone: '9876543210', route: 'Delhi → Gurgaon' }],
+                mainRoute: 'Delhi → Gurgaon',
+                isRental: false,
+                startDate: null,
+                endDate: null
+            },
+            {
+                _id: 'BOOK002',
+                rideType: 'goods',
+                customer: { name: 'Priya Sharma', phone: '9876543212' },
+                driver: { name: 'Amit Verma', phone: '9876543213' },
+                fromCity: 'Mumbai',
+                toCity: 'Pune',
+                amount: 1200,
+                rentalAmount: 0,
+                status: 'ongoing',
+                createdAt: new Date(),
+                passengerDetails: [],
+                mainRoute: 'Mumbai → Pune',
+                isRental: false,
+                startDate: null,
+                endDate: null
+            },
+            {
+                _id: 'BOOK003',
+                rideType: 'cab',
+                customer: { name: 'Amit Patel', phone: '9876543214' },
+                driver: { name: 'Rahul Mehta', phone: '9876543215' },
+                fromCity: 'Ahmedabad',
+                toCity: 'Vadodara',
+                amount: 0,
+                rentalAmount: 2500,
+                status: 'active',
+                createdAt: new Date(),
+                passengerDetails: [{ name: 'Amit Patel', phone: '9876543214', route: 'Ahmedabad → Vadodara' }],
+                mainRoute: 'Ahmedabad → Vadodara',
+                isRental: true,
+                startDate: '2024-04-20',
+                endDate: '2024-04-25'
+            }
+        ];
+        setBookings(mockBookings);
+        setFilteredBookings(mockBookings);
+        setStats({
+            total: 45,
+            searching: 5,
+            available: 8,
+            accepted: 12,
+            ongoing: 6,
+            completed: 10,
+            cancelled: 4,
+            totalAmount: 18500
+        });
+    };
+
     const handleCancelBooking = async () => {
         if (!cancelBookingId) return;
-        
+
         if (!cancelReason.trim()) {
             toast.error('Please provide a reason for cancellation');
             return;
         }
-        
+
         setCancelling(true);
         try {
             const response = await adminAPI.cancelBooking(cancelBookingId, { reason: cancelReason });
-            
+
             if (response.data.success) {
                 toast.success('Booking cancelled successfully');
                 setShowCancelModal(false);
@@ -130,7 +207,7 @@ function AllBookings() {
             const startDate = new Date(dateRange.start);
             const endDate = new Date(dateRange.end);
             endDate.setHours(23, 59, 59, 999);
-            
+
             filtered = filtered.filter(booking => {
                 const bookingDate = new Date(booking.createdAt);
                 return bookingDate >= startDate && bookingDate <= endDate;
@@ -155,10 +232,9 @@ function AllBookings() {
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(12);
         doc.text("Statistics Summary", 14, 30);
-        
+
         const statsData = [
             ["Total Bookings", stats.total],
-            ["Draft", stats.draft],
             ["Searching", stats.searching],
             ["Available", stats.available],
             ["Accepted", stats.accepted],
@@ -180,6 +256,9 @@ function AllBookings() {
         });
 
         const tableData = filteredBookings.map((booking, i) => {
+            const isRental = booking.isRental || (booking.amount === 0 && booking.startDate && booking.endDate);
+            const displayAmount = isRental ? (booking.rentalAmount || 0) : (booking.amount || 0);
+
             if (booking.rideType === 'cab') {
                 const passengerDetails = booking.passengerDetails || [];
                 return [
@@ -189,7 +268,7 @@ function AllBookings() {
                     passengerDetails.map(p => p.name).join('\n') || 'No passengers',
                     passengerDetails.map(p => p.route).join('\n') || '-',
                     booking.mainRoute || 'N/A',
-                    `${booking.amount || 0}`,
+                    displayAmount,
                     new Date(booking.createdAt).toLocaleDateString(),
                     booking.status || 'N/A',
                 ];
@@ -201,7 +280,7 @@ function AllBookings() {
                     booking.customer?.name || 'N/A',
                     `${booking.fromCity || 'N/A'} -> ${booking.toCity || 'N/A'}`,
                     '-',
-                    `${booking.amount || 0}`,
+                    displayAmount,
                     new Date(booking.createdAt).toLocaleDateString(),
                     booking.status || 'N/A',
                 ];
@@ -222,7 +301,7 @@ function AllBookings() {
                 3: { cellWidth: 25 },
                 4: { cellWidth: 30 },
                 5: { cellWidth: 20 },
-                6: { cellWidth: 18, halign: "right" },
+                6: { cellWidth: 15, halign: "right" },
                 7: { cellWidth: 20, halign: "center" },
                 8: { cellWidth: 18, halign: "center" },
             },
@@ -239,15 +318,15 @@ function AllBookings() {
 
     const getStatusBadge = (status) => {
         const config = {
-            draft: { color: 'bg-gray-100 text-gray-700', icon: Clock, label: 'Draft' },
             searching: { color: 'bg-yellow-100 text-yellow-700', icon: Clock, label: 'Searching' },
             available: { color: 'bg-blue-100 text-blue-700', icon: CheckCircle, label: 'Available' },
             accepted: { color: 'bg-cyan-100 text-cyan-700', icon: CheckCircle, label: 'Accepted' },
             ongoing: { color: 'bg-purple-100 text-purple-700', icon: Clock, label: 'Ongoing' },
             completed: { color: 'bg-green-100 text-green-700', icon: CheckCircle, label: 'Completed' },
-            cancelled: { color: 'bg-red-100 text-red-700', icon: XCircle, label: 'Cancelled' }
+            cancelled: { color: 'bg-red-100 text-red-700', icon: XCircle, label: 'Cancelled' },
+            active: { color: 'bg-teal-100 text-teal-700', icon: CheckCircle, label: 'Active' }
         };
-        const c = config[status] || config.draft;
+        const c = config[status] || config.searching;
         const Icon = c.icon;
         return (
             <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${c.color}`}>
@@ -262,7 +341,7 @@ function AllBookings() {
     };
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount || 0);
     };
 
     const clearFilters = () => {
@@ -272,6 +351,12 @@ function AllBookings() {
         setDateRange({ start: '', end: '' });
         setCurrentPage(1);
         fetchBookings();
+    };
+
+    // Helper function to check if cancel button should be shown
+    // Hide cancel button only for 'cancelled' status
+    const shouldShowCancelButton = (status) => {
+        return status !== 'cancelled';
     };
 
     useEffect(() => {
@@ -312,15 +397,11 @@ function AllBookings() {
                 </div>
             </div>
 
-            {/* Status Dashboard Cards - All 7 Status Types */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+            {/* Status Dashboard Cards - 7 statuses including Cancelled */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3">
                 <div className="bg-white rounded-xl p-3 shadow-sm text-center border-l-4 border-blue-500">
                     <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
                     <p className="text-xs text-gray-500">Total</p>
-                </div>
-                <div className="bg-white rounded-xl p-3 shadow-sm text-center border-l-4 border-gray-500">
-                    <p className="text-2xl font-bold text-gray-600">{stats.draft}</p>
-                    <p className="text-xs text-gray-500">Draft</p>
                 </div>
                 <div className="bg-white rounded-xl p-3 shadow-sm text-center border-l-4 border-yellow-500">
                     <p className="text-2xl font-bold text-yellow-600">{stats.searching}</p>
@@ -342,20 +423,13 @@ function AllBookings() {
                     <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
                     <p className="text-xs text-gray-500">Completed</p>
                 </div>
-            </div>
-
-            {/* Cancelled Card */}
-            <div className="bg-gradient-to-r from-red-600 to-orange-500 rounded-xl p-3 text-white">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <p className="text-[10px] opacity-80">Cancelled Bookings</p>
-                        <p className="text-xl font-bold">{stats.cancelled}</p>
-                    </div>
-                    <XCircle className="w-8 h-8 opacity-50" />
+                <div className="bg-white rounded-xl p-3 shadow-sm text-center border-l-4 border-red-500">
+                    <p className="text-2xl font-bold text-red-600">{stats.cancelled}</p>
+                    <p className="text-xs text-gray-500">Cancelled</p>
                 </div>
             </div>
 
-            {/* Revenue Card */}
+            {/* Total Revenue Card */}
             <div className="bg-gradient-to-r from-green-600 to-teal-500 rounded-xl p-3 text-white">
                 <div className="flex justify-between items-center">
                     <div>
@@ -396,7 +470,6 @@ function AllBookings() {
                         className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     >
                         <option value="all">All Status</option>
-                        <option value="draft">Draft</option>
                         <option value="searching">Searching</option>
                         <option value="available">Available</option>
                         <option value="accepted">Accepted</option>
@@ -433,9 +506,9 @@ function AllBookings() {
                 </div>
             </div>
 
-            {/* Bookings Table */}
+            {/* Bookings Table - Cancel Button shows for all except 'cancelled' status */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
-                <table className="w-full min-w-[1000px]">
+                <table className="w-full min-w-[1100px]">
                     <thead className="bg-gray-50">
                         <tr>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">No</th>
@@ -459,156 +532,149 @@ function AllBookings() {
                             </tr>
                         ) : (
                             filteredBookings.map((booking, index) => {
-                                if (booking.rideType === 'cab') {
-                                    const passengerDetails = booking.passengerDetails || [];
-                                    return (
-                                        <tr key={booking._id} className="hover:bg-gray-50 transition">
-                                            <td className="px-3 py-2 text-sm text-gray-500">{index + 1}</td>
-                                            <td className="px-3 py-2 text-sm font-medium text-gray-900">
-                                                #{booking._id?.slice(-8)}
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <div className="flex items-center gap-1">
-                                                    <Car className="w-3 h-3 text-blue-600" />
-                                                    <span className="text-xs text-gray-600">Cab</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-3 py-2">
+                                const isRental = booking.isRental || (booking.amount === 0 && booking.startDate && booking.endDate);
+                                const displayAmount = isRental ? (booking.rentalAmount || 0) : (booking.amount || 0);
+                                // Show cancel button only for non-cancelled bookings
+                                const showCancelBtn = shouldShowCancelButton(booking.status);
+
+                                return (
+                                    <tr key={booking._id} className="hover:bg-gray-50 transition">
+                                        <td className="px-3 py-2 text-sm text-gray-500">{index + 1}</td>
+                                        <td className="px-3 py-2 text-sm font-medium text-gray-900">
+                                            #{booking._id?.slice(-8)}
+                                            {isRental && (
+                                                <span className="ml-1 text-[10px] bg-teal-100 text-teal-700 px-1 rounded">Rental</span>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex items-center gap-1">
+                                                {booking.rideType === 'cab' ?
+                                                    <Car className="w-3 h-3 text-blue-600" /> :
+                                                    <Truck className="w-3 h-3 text-green-600" />
+                                                }
+                                                <span className="text-xs text-gray-600">
+                                                    {booking.rideType === 'cab' ? 'Cab' : 'Goods'}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {booking.rideType === 'cab' ? (
                                                 <div className="max-w-[180px]">
-                                                    {passengerDetails.length === 0 ? (
+                                                    {(booking.passengerDetails || []).length === 0 ? (
                                                         <p className="text-xs text-gray-500">No passengers</p>
                                                     ) : (
-                                                        passengerDetails.map((p, idx) => (
+                                                        (booking.passengerDetails || []).map((p, idx) => (
                                                             <p key={idx} className="text-xs text-gray-900 leading-tight">
                                                                 {p.name}
                                                             </p>
                                                         ))
                                                     )}
                                                 </div>
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <div className="max-w-[180px]">
-                                                    <p className="text-xs text-gray-600">{booking.mainRoute || 'N/A'}</p>
-                                                    {passengerDetails.length > 0 && (
-                                                        <div className="mt-1 pt-1 border-t border-gray-100">
-                                                            {passengerDetails.map((p, idx) => (
-                                                                <p key={idx} className="text-[9px] text-gray-400">
-                                                                    {p.route}
-                                                                </p>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <p className="text-sm text-gray-900">{booking.driver?.name || 'Not assigned'}</p>
-                                                <p className="text-xs text-gray-500">{booking.driver?.phone || ''}</p>
-                                            </td>
-                                            <td className="px-3 py-2 text-sm font-semibold text-green-600 whitespace-nowrap">
-                                                {formatCurrency(booking.amount || 0)}
-                                            </td>
-                                            <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
-                                                {new Date(booking.createdAt).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-3 py-2">{getStatusBadge(booking.status)}</td>
-                                            <td className="px-3 py-2">
+                                            ) : (
+                                                <>
+                                                    <p className="text-sm text-gray-900">{booking.customer?.name || 'N/A'}</p>
+                                                    <p className="text-xs text-gray-500">{booking.customer?.phone || 'N/A'}</p>
+                                                </>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {isRental && booking.startDate && booking.endDate ? (
                                                 <div className="flex items-center gap-1">
+                                                    <Calendar className="w-3 h-3 text-teal-500" />
+                                                    <span className="text-xs text-teal-600">
+                                                        {new Date(booking.startDate).toLocaleDateString()} → {new Date(booking.endDate).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                booking.rideType === 'cab' ? (
+                                                    <div className="max-w-[180px]">
+                                                        <p className="text-xs text-gray-600">{booking.mainRoute || 'N/A'}</p>
+                                                        {(booking.passengerDetails || []).length > 0 && (
+                                                            <div className="mt-1 pt-1 border-t border-gray-100">
+                                                                {(booking.passengerDetails || []).map((p, idx) => (
+                                                                    <p key={idx} className="text-[9px] text-gray-400">
+                                                                        {p.route}
+                                                                    </p>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-1">
+                                                        <MapPin className="w-3 h-3 text-gray-400" />
+                                                        <span className="text-xs text-gray-600">{booking.fromCity || 'N/A'} → {booking.toCity || 'N/A'}</span>
+                                                    </div>
+                                                )
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <p className="text-sm text-gray-900">{booking.driver?.name || 'Not assigned'}</p>
+                                            <p className="text-xs text-gray-500">{booking.driver?.phone || ''}</p>
+                                        </td>
+                                        <td className="px-3 py-2 text-sm font-semibold text-green-600 whitespace-nowrap">
+                                            {formatCurrency(displayAmount)}
+                                        </td>
+                                        <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                                            {new Date(booking.createdAt).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-3 py-2">{getStatusBadge(booking.status)}</td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedBooking(booking);
+                                                        setShowModal(true);
+                                                    }}
+                                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                                    title="View Details"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                </button>
+                                                {/* Cancel Button - Shows for all bookings except 'cancelled' */}
+                                                {showCancelBtn && (
                                                     <button
                                                         onClick={() => {
-                                                            setSelectedBooking(booking);
-                                                            setShowModal(true);
+                                                            setCancelBookingId(booking._id);
+                                                            setShowCancelModal(true);
                                                         }}
-                                                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                                        title="View Details"
+                                                        className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                                        title="Cancel Booking"
                                                     >
-                                                        <Eye className="w-4 h-4" />
+                                                        <XCircle className="w-4 h-4" />
                                                     </button>
-                                                    {booking.status !== 'cancelled' && booking.status !== 'completed' && (
-                                                        <button
-                                                            onClick={() => {
-                                                                setCancelBookingId(booking._id);
-                                                                setShowCancelModal(true);
-                                                            }}
-                                                            className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                                            title="Cancel Booking"
-                                                        >
-                                                            <XCircle className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                } else {
-                                    return (
-                                        <tr key={booking._id} className="hover:bg-gray-50 transition">
-                                            <td className="px-3 py-2 text-sm text-gray-500">{index + 1}</td>
-                                            <td className="px-3 py-2 text-sm font-medium text-gray-900">
-                                                #{booking._id?.slice(-8)}
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <div className="flex items-center gap-1">
-                                                    <Truck className="w-3 h-3 text-green-600" />
-                                                    <span className="text-xs text-gray-600">Goods</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <p className="text-sm text-gray-900">{booking.customer?.name || 'N/A'}</p>
-                                                <p className="text-xs text-gray-500">{booking.customer?.phone || 'N/A'}</p>
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <div className="flex items-center gap-1">
-                                                    <MapPin className="w-3 h-3 text-gray-400" />
-                                                    <span className="text-xs text-gray-600">{booking.fromCity || 'N/A'}</span>
-                                                    <span className="text-gray-400 text-xs">→</span>
-                                                    <span className="text-xs text-gray-600">{booking.toCity || 'N/A'}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <p className="text-sm text-gray-900">{booking.driver?.name || 'Not assigned'}</p>
-                                                <p className="text-xs text-gray-500">{booking.driver?.phone || ''}</p>
-                                            </td>
-                                            <td className="px-3 py-2 text-sm font-semibold text-green-600 whitespace-nowrap">
-                                                {formatCurrency(booking.amount || 0)}
-                                            </td>
-                                            <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
-                                                {new Date(booking.createdAt).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-3 py-2">{getStatusBadge(booking.status)}</td>
-                                            <td className="px-3 py-2">
-                                                <div className="flex items-center gap-1">
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedBooking(booking);
-                                                            setShowModal(true);
-                                                        }}
-                                                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                                        title="View Details"
-                                                    >
-                                                        <Eye className="w-4 h-4" />
-                                                    </button>
-                                                    {booking.status !== 'cancelled' && booking.status !== 'completed' && (
-                                                        <button
-                                                            onClick={() => {
-                                                                setCancelBookingId(booking._id);
-                                                                setShowCancelModal(true);
-                                                            }}
-                                                            className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                                            title="Cancel Booking"
-                                                        >
-                                                            <XCircle className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                }
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
                             })
                         )}
                     </tbody>
                 </table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm">
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1 border border-gray-300 rounded-lg text-sm disabled:opacity-50"
+                    >
+                        Previous
+                    </button>
+                    <span className="text-sm text-gray-600">
+                        Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1 border border-gray-300 rounded-lg text-sm disabled:opacity-50"
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
 
             {/* Booking Details Modal */}
             {showModal && selectedBooking && (
@@ -622,7 +688,6 @@ function AllBookings() {
                         </div>
 
                         <div className="p-5 space-y-4">
-                            {/* Booking Summary */}
                             <div className="bg-gradient-to-r from-blue-600 to-cyan-500 rounded-xl p-4 text-white">
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
@@ -639,7 +704,11 @@ function AllBookings() {
                                     </div>
                                     <div>
                                         <p className="text-xs text-white/80">Amount</p>
-                                        <p className="text-base font-bold">{formatCurrency(selectedBooking.amount || 0)}</p>
+                                        <p className="text-base font-bold">
+                                            {selectedBooking.isRental ?
+                                                formatCurrency(selectedBooking.rentalAmount || 0) :
+                                                formatCurrency(selectedBooking.amount || 0)}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -664,13 +733,13 @@ function AllBookings() {
                                             <MapPin className="w-4 h-4 text-blue-600" />
                                             Route Details
                                         </h4>
-                                        <p className="text-sm font-medium text-gray-900">{selectedBooking.mainRoute || 'N/A'}</p>
-                                        {(selectedBooking.passengerDetails || []).length > 0 && (
-                                            <div className="mt-2 pt-2 border-t border-gray-100">
-                                                {selectedBooking.passengerDetails.map((p, idx) => (
-                                                    <p key={idx} className="text-xs text-gray-500">{p.route}</p>
-                                                ))}
-                                            </div>
+                                        {(selectedBooking.isRental || (selectedBooking.amount === 0 && selectedBooking.startDate && selectedBooking.endDate)) && selectedBooking.startDate && selectedBooking.endDate ? (
+                                            <>
+                                                <p className="text-sm text-gray-600">Start Date: {new Date(selectedBooking.startDate).toLocaleDateString()}</p>
+                                                <p className="text-sm text-gray-600">End Date: {new Date(selectedBooking.endDate).toLocaleDateString()}</p>
+                                            </>
+                                        ) : (
+                                            <p className="text-sm font-medium text-gray-900">{selectedBooking.mainRoute || 'N/A'}</p>
                                         )}
                                     </div>
                                 </>
@@ -689,12 +758,18 @@ function AllBookings() {
                                             <MapPin className="w-4 h-4 text-blue-600" />
                                             Route Details
                                         </h4>
-                                        <p className="text-sm text-gray-600">{selectedBooking.fromCity || 'N/A'} → {selectedBooking.toCity || 'N/A'}</p>
+                                        {(selectedBooking.isRental || (selectedBooking.amount === 0 && selectedBooking.startDate && selectedBooking.endDate)) && selectedBooking.startDate && selectedBooking.endDate ? (
+                                            <>
+                                                <p className="text-sm text-gray-600">Start Date: {new Date(selectedBooking.startDate).toLocaleDateString()}</p>
+                                                <p className="text-sm text-gray-600">End Date: {new Date(selectedBooking.endDate).toLocaleDateString()}</p>
+                                            </>
+                                        ) : (
+                                            <p className="text-sm text-gray-600">{selectedBooking.fromCity || 'N/A'} → {selectedBooking.toCity || 'N/A'}</p>
+                                        )}
                                     </div>
                                 </>
                             )}
 
-                            {/* Driver Details */}
                             <div className="border border-gray-200 rounded-lg p-3">
                                 <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
                                     <User className="w-4 h-4" />
@@ -706,7 +781,6 @@ function AllBookings() {
                                 </div>
                             </div>
 
-                            {/* Payment Details */}
                             {selectedBooking.payment && (
                                 <div className="border border-gray-200 rounded-lg p-3">
                                     <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
@@ -734,25 +808,25 @@ function AllBookings() {
                                 <AlertTriangle className="w-5 h-5 text-red-500" />
                                 <h3 className="text-lg font-bold text-gray-900">Cancel Booking</h3>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => {
                                     setShowCancelModal(false);
                                     setCancelReason('');
                                     setCancelBookingId(null);
-                                }} 
+                                }}
                                 className="p-1 hover:bg-gray-100 rounded-lg"
                             >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
-                        
+
                         <div className="p-5 space-y-4">
                             <div className="bg-red-50 rounded-lg p-3 border border-red-100">
                                 <p className="text-sm text-red-700">
                                     Are you sure you want to cancel this booking? This action cannot be undone.
                                 </p>
                             </div>
-                            
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Reason for Cancellation <span className="text-red-500">*</span>
@@ -765,7 +839,7 @@ function AllBookings() {
                                     rows="3"
                                 />
                             </div>
-                            
+
                             <div className="flex gap-3 pt-2">
                                 <button
                                     onClick={() => {

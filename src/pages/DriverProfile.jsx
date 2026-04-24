@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  User, Phone, Mail, MapPin, Calendar, Star, Car,
-  CreditCard, Shield, Edit2, Save, X, ArrowLeft,
-  CheckCircle, XCircle, AlertCircle, Clock, FileText,
-  Eye, Truck, Package, IdCard, Award, Wrench, Ban,
-  Users, Weight, Box, Ruler, Fuel, Navigation,
-  Info, Building, Hash, Calendar as CalIcon, DollarSign,
-  TrendingUp, Activity, Smartphone, Home, CreditCard as CardIcon,
-  Layers, Settings, Key, Camera, Image, File, CheckSquare,
-  Sparkles, Briefcase, UserCheck, UserX, Download, RefreshCw
+  User, Phone, Mail, MapPin, Calendar, Car,
+  CreditCard, Shield, ArrowLeft,
+  CheckCircle, XCircle, AlertCircle, Clock,
+  Eye, Truck, Package, IdCard, Wrench, Ban,
+  Weight, Navigation,
+  DollarSign,
+  UserCheck, UserX, Download, RefreshCw
 } from 'lucide-react';
 import { adminAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import autoTable from "jspdf-autotable";
+
+// Helper function for full number format - NO abbreviations
+const formatFullNumber = (amount) => {
+  if (!amount || amount === 0) return '₹0';
+  const num = Math.round(amount || 0);
+  return `₹${num.toLocaleString('en-IN')}`;
+};
 
 function DriverProfile() {
   const { id } = useParams();
@@ -79,7 +84,6 @@ function DriverProfile() {
     const doc = new jsPDF("p", "mm", "a4");
     const date = new Date().toLocaleString();
 
-    // Page 1 - Header
     doc.setFillColor(41, 98, 255);
     doc.rect(0, 0, 210, 22, "F");
     doc.setTextColor(255);
@@ -88,22 +92,20 @@ function DriverProfile() {
     doc.setFontSize(9);
     doc.text(`Generated: ${date}`, 105, 17, { align: "center" });
 
-    // Personal Information - Page 1
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(14);
     doc.text("Personal Information", 14, 35);
-    
+
     const personalInfo = [
       ["Full Name", getFullName()],
       ["Phone Number", getPhone()],
       ["Email", getEmail()],
       ["Address", getAddress()],
       ["Status", getStatus()],
-      ["Rating", `${getRating()} / 5`],
       ["Total Rides", getTotalRides()],
-      ["Total Earnings", `${getTotalEarnings().toLocaleString()}`],
-      ["Today's Earnings", `${getValue(driver.todayEarnings, 0).toLocaleString()}`],
-      ["Monthly Earnings", `${getValue(driver.monthlyEarnings, 0).toLocaleString()}`],
+      ["Total Earnings", `${Math.round(getTotalEarnings()).toLocaleString('en-IN')}`],
+      ["Today's Earnings", `${Math.round(getValue(driver.todayEarnings, 0)).toLocaleString('en-IN')}`],
+      ["Monthly Earnings", `${Math.round(getValue(driver.monthlyEarnings, 0)).toLocaleString('en-IN')}`],
     ];
 
     autoTable(doc, {
@@ -119,7 +121,6 @@ function DriverProfile() {
 
     let yPos = doc.lastAutoTable.finalY + 10;
 
-    // Vehicle Information - Page 1
     doc.setFontSize(14);
     doc.text("Vehicle Information", 14, yPos);
     yPos += 8;
@@ -158,7 +159,6 @@ function DriverProfile() {
       },
     });
 
-    // Insurance Information - Page 1
     if (driver.insuranceNumber) {
       yPos = doc.lastAutoTable.finalY + 10;
       doc.setFontSize(14);
@@ -169,7 +169,7 @@ function DriverProfile() {
         ["Insurance Number", getValue(driver.insuranceNumber, 'N/A')],
         ["Insurance Expiry", driver.insuranceExpiry ? new Date(driver.insuranceExpiry).toLocaleDateString() : 'N/A'],
       ];
-      
+
       if (driverType === 'cab') {
         insuranceInfo.push(["PUC Expiry", driver.pucExpiry ? new Date(driver.pucExpiry).toLocaleDateString() : 'N/A']);
       }
@@ -186,21 +186,19 @@ function DriverProfile() {
       });
     }
 
-    // ID & License Information - NEW PAGE (Page 2)
     if (driverType === 'cab' && (driver.idType || driver.dlNumber)) {
       doc.addPage();
       let yPosPage2 = 20;
-      
-      // Header for page 2
+
       doc.setFillColor(41, 98, 255);
       doc.rect(0, 0, 210, 15, "F");
       doc.setTextColor(255);
       doc.setFontSize(12);
       doc.text("ID & License Information", 105, 10, { align: "center" });
-      
+
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(12);
-      
+
       const licenseInfo = [
         ["ID Type", getValue(driver.idType, 'N/A')],
         ["ID Number", getValue(driver.idNumber, 'N/A')],
@@ -277,10 +275,9 @@ function DriverProfile() {
   const getEmail = () => driver?.email || driver?.userId?.email || 'Not provided';
   const getAddress = () => driver?.address || 'Not set';
   const getStatus = () => driver?.status || 'pending';
-  const getRating = () => driver?.rating || 4.5;
   const getTotalRides = () => driver?.totalRides || 0;
   const getTotalEarnings = () => driver?.totalEarnings || 0;
-  const getIsOnline = () => driver?.isOnline || false;
+  const getProfilePhoto = () => driver?.profilePicture || driver?.profilePhoto || null;
 
   if (loading) {
     return (
@@ -311,7 +308,7 @@ function DriverProfile() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Driver Profile</h1>
             <p className="text-sm text-gray-500 mt-1">
-              {driverType === 'cab' ? '🚖 Cab Driver' : driverType === 'goods' ? '🚚 Goods Driver' : 'Driver'}
+              {driverType === 'cab' ? 'Cab Driver' : driverType === 'goods' ? 'Goods Driver' : 'Driver'}
               | ID: {driver.userId || driver._id?.slice(-8)}
             </p>
           </div>
@@ -358,14 +355,27 @@ function DriverProfile() {
         <div className={`bg-gradient-to-r ${driverType === 'cab' ? 'from-purple-600 to-pink-500' : driverType === 'goods' ? 'from-green-600 to-emerald-500' : 'from-gray-600 to-gray-500'} px-6 py-8`}>
           <div className="flex flex-col sm:flex-row items-center gap-6">
             <div className="relative">
-              <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center">
-                {driverType === 'cab' ?
-                  <Car className="w-12 h-12 text-white" /> :
-                  driverType === 'goods' ?
-                    <Truck className="w-12 h-12 text-white" /> :
-                    <User className="w-12 h-12 text-white" />
-                }
-              </div>
+              {getProfilePhoto() ? (
+                <img
+                  src={getProfilePhoto()}
+                  alt={getFullName()}
+                  className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML = '<div class="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center"><svg class="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></div>';
+                  }}
+                />
+              ) : (
+                <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center">
+                  {driverType === 'cab' ?
+                    <Car className="w-12 h-12 text-white" /> :
+                    driverType === 'goods' ?
+                      <Truck className="w-12 h-12 text-white" /> :
+                      <User className="w-12 h-12 text-white" />
+                  }
+                </div>
+              )}
               <div className="absolute -bottom-2 -right-2">
                 {getStatus() === 'approved' ? (
                   <CheckCircle className="w-6 h-6 text-green-400 bg-white rounded-full" />
@@ -379,32 +389,26 @@ function DriverProfile() {
             <div className="text-center sm:text-left">
               <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
                 <h2 className="text-2xl font-bold text-white">{getFullName()}</h2>
-                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
-                  getStatus() === 'approved' ? 'bg-green-100 text-green-700' :
-                  getStatus() === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                }`}>
+                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${getStatus() === 'approved' ? 'bg-green-100 text-green-700' :
+                    getStatus() === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                  }`}>
                   {getStatus() === 'approved' ? <CheckCircle className="w-3 h-3" /> :
                     getStatus() === 'pending' ? <Clock className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                   {getStatus().charAt(0).toUpperCase() + getStatus().slice(1)}
                 </span>
               </div>
-              <p className="text-purple-100 mt-2">Member since {driver.createdAt ? new Date(driver.createdAt).toLocaleDateString() : 'N/A'}</p>
+              <p className="text-white/80 text-sm mt-1">Member since {driver.createdAt ? new Date(driver.createdAt).toLocaleDateString() : 'N/A'}</p>
               <div className="flex items-center gap-2 mt-2 justify-center sm:justify-start">
-                <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                <span className="text-white">{getRating()} ⭐</span>
-                <span className="text-purple-200">•</span>
-                <span className="text-purple-100">{getTotalRides()} rides</span>
-                <span className="text-purple-200">•</span>
-                <span className="text-purple-100">{getIsOnline() ? '🟢 Online' : '🔴 Offline'}</span>
+                <span className="text-white/80 text-sm">{getTotalRides()} rides completed</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Quick Stats */}
+        {/* Quick Stats - Full number format */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-6 border-b border-gray-100 bg-gray-50">
           <div className="text-center">
-            <p className="text-2xl font-bold text-gray-900">₹{getTotalEarnings().toLocaleString()}</p>
+            <p className="text-2xl font-bold text-gray-900">{formatFullNumber(getTotalEarnings())}</p>
             <p className="text-xs text-gray-500">Total Earnings</p>
           </div>
           <div className="text-center">
@@ -412,11 +416,11 @@ function DriverProfile() {
             <p className="text-xs text-gray-500">Total Rides</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-green-600">₹{getValue(driver.todayEarnings, 0).toLocaleString()}</p>
+            <p className="text-2xl font-bold text-green-600">{formatFullNumber(getValue(driver.todayEarnings, 0))}</p>
             <p className="text-xs text-gray-500">Today's Earnings</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-blue-600">₹{getValue(driver.monthlyEarnings, 0).toLocaleString()}</p>
+            <p className="text-2xl font-bold text-blue-600">{formatFullNumber(getValue(driver.monthlyEarnings, 0))}</p>
             <p className="text-xs text-gray-500">Monthly Earnings</p>
           </div>
         </div>
@@ -441,7 +445,6 @@ function DriverProfile() {
         {/* ============ CAB DRIVER SPECIFIC SECTIONS ============ */}
         {driverType === 'cab' && (
           <>
-            {/* Cab Vehicle Information */}
             <div className="p-6 border-b border-gray-100">
               <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Car className="w-5 h-5 text-blue-600" />
@@ -458,7 +461,6 @@ function DriverProfile() {
               </div>
             </div>
 
-            {/* Insurance & PUC */}
             <div className="p-6 border-b border-gray-100">
               <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Shield className="w-5 h-5 text-orange-600" />
@@ -471,7 +473,6 @@ function DriverProfile() {
               </div>
             </div>
 
-            {/* ID & License Documents */}
             <div className="p-6">
               <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <IdCard className="w-5 h-5 text-red-600" />
@@ -491,7 +492,6 @@ function DriverProfile() {
         {/* ============ GOODS DRIVER SPECIFIC SECTIONS ============ */}
         {driverType === 'goods' && (
           <>
-            {/* Goods Vehicle Information */}
             <div className="p-6 border-b border-gray-100">
               <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Truck className="w-5 h-5 text-green-600" />
@@ -510,7 +510,6 @@ function DriverProfile() {
               </div>
             </div>
 
-            {/* Insurance */}
             <div className="p-6">
               <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Shield className="w-5 h-5 text-orange-600" />

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Search, Eye, CheckCircle, XCircle, Clock, User, Car, 
+import {
+  Search, Eye, CheckCircle, XCircle, Clock, User, Car,
   Truck, FileText, Image, Camera, Shield, AlertCircle,
-  RefreshCw, UserCheck, UserX, Phone, Mail, MapPin, 
-  Calendar, IdCard, Award, Navigation, CreditCard, 
-  Home, Hash, Building, Weight, Box, Ruler, Fuel
+  RefreshCw, UserCheck, UserX, Phone, Mail, MapPin,
+  Calendar, IdCard, Award, Navigation, CreditCard,
+  Home, Hash, Building, Weight, Box, Ruler, Fuel,
+  Download, ZoomIn, X
 } from 'lucide-react';
 import { adminAPI } from '../services/api';
 import toast from 'react-hot-toast';
@@ -19,6 +20,9 @@ function DriverVerification() {
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [remarks, setRemarks] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [imageErrors, setImageErrors] = useState({});
 
   useEffect(() => {
     fetchPendingVerifications();
@@ -42,7 +46,7 @@ function DriverVerification() {
     setProcessing(true);
     try {
       const driverId = selectedDriver?.userId || selectedDriver?._id;
-      
+
       const response = await adminAPI.processVerification(
         driverId,
         'approve',
@@ -52,7 +56,7 @@ function DriverVerification() {
           reason: ''
         }
       );
-      
+
       if (response.data.success) {
         toast.success('Driver approved successfully!');
         setShowModal(false);
@@ -73,11 +77,11 @@ function DriverVerification() {
       toast.error('Please provide a reason for rejection');
       return;
     }
-    
+
     setProcessing(true);
     try {
       const driverId = selectedDriver?.userId || selectedDriver?._id;
-      
+
       const response = await adminAPI.processVerification(
         driverId,
         'reject',
@@ -87,7 +91,7 @@ function DriverVerification() {
           reason: remarks
         }
       );
-      
+
       if (response.data.success) {
         toast.success('Driver rejected successfully');
         setShowModal(false);
@@ -110,6 +114,35 @@ function DriverVerification() {
     setShowModal(true);
     setRemarks('');
     setShowRejectConfirm(false);
+    setImageErrors({});
+  };
+
+  const openImageViewer = (imageUrl, documentName) => {
+    if (!imageUrl) return;
+    const proxiedUrl = imageUrl.startsWith('http') ? imageUrl : `https://dump-and-drop.onrender.com${imageUrl}`;
+    setSelectedImage({ url: proxiedUrl, name: documentName });
+    setShowImageModal(true);
+  };
+
+  const downloadImage = async (imageUrl, fileName) => {
+    try {
+      const url = imageUrl.startsWith('http') ? imageUrl : `https://dump-and-drop.onrender.com${imageUrl}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast.success('Image download started');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Failed to download image. Please try right-click and save.');
+    }
+  };
+
+  const handleImageError = (imageKey) => {
+    setImageErrors(prev => ({ ...prev, [imageKey]: true }));
   };
 
   const getAllDrivers = () => {
@@ -120,14 +153,14 @@ function DriverVerification() {
     if (selectedType === 'all' || selectedType === 'goods') {
       all = [...all, ...drivers.goods.map(d => ({ ...d, driverType: 'goods' }))];
     }
-    
+
     if (searchTerm) {
-      all = all.filter(d => 
+      all = all.filter(d =>
         (d.fullName || d.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (d.phone || '').includes(searchTerm)
       );
     }
-    
+
     return all;
   };
 
@@ -141,6 +174,35 @@ function DriverVerification() {
     ];
     const uploadedCount = docs.filter(d => d.uploaded).length;
     return { total: docs.length, uploaded: uploadedCount, percentage: (uploadedCount / docs.length) * 100 };
+  };
+
+  const getDocumentImages = (driver, type) => {
+    const images = [];
+    switch (type) {
+      case 'id':
+        if (driver.idFrontUrl) images.push({ url: driver.idFrontUrl, name: 'ID Proof (Front)' });
+        if (driver.idBackUrl) images.push({ url: driver.idBackUrl, name: 'ID Proof (Back)' });
+        break;
+      case 'license':
+        if (driver.dlFrontUrl) images.push({ url: driver.dlFrontUrl, name: 'Driving License (Front)' });
+        if (driver.dlBackUrl) images.push({ url: driver.dlBackUrl, name: 'Driving License (Back)' });
+        break;
+      case 'vehicle':
+        if (driver.rcPhotoUrl) images.push({ url: driver.rcPhotoUrl, name: 'RC Book' });
+        if (driver.vehiclePhotoUrl) images.push({ url: driver.vehiclePhotoUrl, name: 'Vehicle Photo' });
+        break;
+      case 'insurance':
+        if (driver.insurancePhotoUrl) images.push({ url: driver.insurancePhotoUrl, name: 'Insurance Document' });
+        break;
+      default:
+        break;
+    }
+    return images;
+  };
+
+  const getImageUrl = (url) => {
+    if (!url) return null;
+    return url.startsWith('http') ? url : `https://dump-and-drop.onrender.com${url}`;
   };
 
   if (loading) {
@@ -167,7 +229,7 @@ function DriverVerification() {
           <h1 className="text-2xl font-bold text-gray-900">Driver Verification</h1>
           <p className="text-sm text-gray-500 mt-1">Review and verify driver document submissions</p>
         </div>
-        <button 
+        <button
           onClick={fetchPendingVerifications}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
         >
@@ -221,7 +283,7 @@ function DriverVerification() {
         </div>
       </div>
 
-      {/* Drivers List - Only Basic Details */}
+      {/* Drivers List */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {allDrivers.length === 0 ? (
           <div className="col-span-full bg-white rounded-xl p-12 text-center">
@@ -237,11 +299,10 @@ function DriverVerification() {
                 <div className="p-5">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        driver.driverType === 'cab' ? 'bg-purple-100' : 'bg-green-100'
-                      }`}>
-                        {driver.driverType === 'cab' ? 
-                          <Car className="w-5 h-5 text-purple-600" /> : 
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${driver.driverType === 'cab' ? 'bg-purple-100' : 'bg-green-100'
+                        }`}>
+                        {driver.driverType === 'cab' ?
+                          <Car className="w-5 h-5 text-purple-600" /> :
                           <Truck className="w-5 h-5 text-green-600" />
                         }
                       </div>
@@ -275,26 +336,10 @@ function DriverVerification() {
                       <span>{docStatus.uploaded}/{docStatus.total}</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
+                      <div
                         className={`h-2 rounded-full transition-all ${docStatus.percentage === 100 ? 'bg-green-500' : 'bg-yellow-500'}`}
                         style={{ width: `${docStatus.percentage}%` }}
                       />
-                    </div>
-                  </div>
-
-                  {/* Document Icons */}
-                  <div className="flex gap-3 mb-4">
-                    <div className={`p-2 rounded-lg ${driver.idFrontUrl ? 'bg-green-100' : 'bg-gray-100'}`}>
-                      <FileText className={`w-4 h-4 ${driver.idFrontUrl ? 'text-green-600' : 'text-gray-400'}`} />
-                    </div>
-                    <div className={`p-2 rounded-lg ${driver.dlFrontUrl ? 'bg-green-100' : 'bg-gray-100'}`}>
-                      <Camera className={`w-4 h-4 ${driver.dlFrontUrl ? 'text-green-600' : 'text-gray-400'}`} />
-                    </div>
-                    <div className={`p-2 rounded-lg ${driver.rcPhotoUrl ? 'bg-green-100' : 'bg-gray-100'}`}>
-                      <Shield className={`w-4 h-4 ${driver.rcPhotoUrl ? 'text-green-600' : 'text-gray-400'}`} />
-                    </div>
-                    <div className={`p-2 rounded-lg ${driver.insurancePhotoUrl ? 'bg-green-100' : 'bg-gray-100'}`}>
-                      <Image className={`w-4 h-4 ${driver.insurancePhotoUrl ? 'text-green-600' : 'text-gray-400'}`} />
                     </div>
                   </div>
 
@@ -312,10 +357,10 @@ function DriverVerification() {
         )}
       </div>
 
-      {/* Review Modal - Shows ALL Details Based on Driver Type */}
+      {/* Review Modal */}
       {showModal && selectedDriver && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-100 p-5 flex justify-between items-center">
               <h3 className="text-lg font-bold text-gray-900">
                 {selectedDriver.driverType === 'cab' ? 'Cab Driver Details' : 'Goods Driver Details'}
@@ -324,14 +369,14 @@ function DriverVerification() {
                 <XCircle className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="p-5">
               {/* Profile Header */}
               <div className={`bg-gradient-to-r ${selectedDriver.driverType === 'cab' ? 'from-purple-600 to-pink-500' : 'from-green-600 to-emerald-500'} -mx-5 -mt-5 px-6 py-6 mb-6`}>
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-                    {selectedDriver.driverType === 'cab' ? 
-                      <Car className="w-8 h-8 text-white" /> : 
+                    {selectedDriver.driverType === 'cab' ?
+                      <Car className="w-8 h-8 text-white" /> :
                       <Truck className="w-8 h-8 text-white" />
                     }
                   </div>
@@ -363,28 +408,122 @@ function DriverVerification() {
                     </div>
                   </div>
 
-                  {/* ID & License Documents - ONLY FOR CAB DRIVERS */}
+                  {/* ID & License Documents with Images below */}
                   <div className="mb-6">
                     <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                       <IdCard className="w-5 h-5 text-red-600" />
                       ID & License Documents
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg mb-4">
                       <div><p className="text-xs text-gray-500">ID Type</p><p className="text-sm">{selectedDriver.idType || 'N/A'}</p></div>
                       <div><p className="text-xs text-gray-500">ID Number</p><p className="text-sm">{selectedDriver.idNumber || 'N/A'}</p></div>
                       <div><p className="text-xs text-gray-500">Driving License No.</p><p className="text-sm">{selectedDriver.dlNumber || 'N/A'}</p></div>
                       <div><p className="text-xs text-gray-500">License Valid From</p><p className="text-sm">{selectedDriver.dlValidFrom ? new Date(selectedDriver.dlValidFrom).toLocaleDateString() : 'N/A'}</p></div>
                       <div><p className="text-xs text-gray-500">License Valid To</p><p className="text-sm">{selectedDriver.dlValidTo ? new Date(selectedDriver.dlValidTo).toLocaleDateString() : 'N/A'}</p></div>
                     </div>
+
+                    {/* ID Proof Images */}
+                    {(() => {
+                      const idImages = getDocumentImages(selectedDriver, 'id');
+                      if (idImages.length > 0) {
+                        return (
+                          <div className="mt-3">
+                            <p className="text-sm font-medium text-gray-700 mb-2">ID Proof Images:</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {idImages.map((img, idx) => (
+                                <div key={idx} className="border rounded-lg p-2 bg-gray-50">
+                                  <p className="text-xs text-gray-600 mb-1">{img.name}</p>
+                                  {!imageErrors[img.url] ? (
+                                    <img
+                                      src={getImageUrl(img.url)}
+                                      alt={img.name}
+                                      className="w-full h-32 object-cover rounded cursor-pointer hover:opacity-80"
+                                      onClick={() => openImageViewer(img.url, img.name)}
+                                      onError={() => handleImageError(img.url)}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-32 bg-gray-200 rounded flex items-center justify-center">
+                                      <p className="text-xs text-gray-500">Image not available</p>
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2 mt-2">
+                                    <button
+                                      onClick={() => openImageViewer(img.url, img.name)}
+                                      className="flex-1 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center justify-center gap-1"
+                                    >
+                                      <Eye className="w-3 h-3" /> View
+                                    </button>
+                                    <button
+                                      onClick={() => downloadImage(img.url, `${selectedDriver.name}_${img.name}.jpg`)}
+                                      className="flex-1 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 flex items-center justify-center gap-1"
+                                    >
+                                      <Download className="w-3 h-3" /> Download
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {/* Driving License Images */}
+                    {(() => {
+                      const licenseImages = getDocumentImages(selectedDriver, 'license');
+                      if (licenseImages.length > 0) {
+                        return (
+                          <div className="mt-4">
+                            <p className="text-sm font-medium text-gray-700 mb-2">Driving License Images:</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {licenseImages.map((img, idx) => (
+                                <div key={idx} className="border rounded-lg p-2 bg-gray-50">
+                                  <p className="text-xs text-gray-600 mb-1">{img.name}</p>
+                                  {!imageErrors[img.url] ? (
+                                    <img
+                                      src={getImageUrl(img.url)}
+                                      alt={img.name}
+                                      className="w-full h-32 object-cover rounded cursor-pointer hover:opacity-80"
+                                      onClick={() => openImageViewer(img.url, img.name)}
+                                      onError={() => handleImageError(img.url)}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-32 bg-gray-200 rounded flex items-center justify-center">
+                                      <p className="text-xs text-gray-500">Image not available</p>
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2 mt-2">
+                                    <button
+                                      onClick={() => openImageViewer(img.url, img.name)}
+                                      className="flex-1 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center justify-center gap-1"
+                                    >
+                                      <Eye className="w-3 h-3" /> View
+                                    </button>
+                                    <button
+                                      onClick={() => downloadImage(img.url, `${selectedDriver.name}_${img.name}.jpg`)}
+                                      className="flex-1 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 flex items-center justify-center gap-1"
+                                    >
+                                      <Download className="w-3 h-3" /> Download
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
 
-                  {/* Cab Vehicle Information */}
+                  {/* Vehicle Information */}
                   <div className="mb-6">
                     <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                       <Car className="w-5 h-5 text-blue-600" />
                       Vehicle Information
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg mb-4">
                       <div><p className="text-xs text-gray-500">Vehicle Type</p><p className="text-sm font-medium">{selectedDriver.vehicleType || 'N/A'}</p></div>
                       <div><p className="text-xs text-gray-500">Registration Number</p><p className="text-sm">{selectedDriver.regNumber || 'N/A'}</p></div>
                       <div><p className="text-xs text-gray-500">Brand / Model</p><p className="text-sm">{selectedDriver.brand || 'N/A'} {selectedDriver.model || ''}</p></div>
@@ -393,19 +532,113 @@ function DriverVerification() {
                       <div><p className="text-xs text-gray-500">Seat Capacity</p><p className="text-sm font-semibold">{selectedDriver.seatCapacity || 'N/A'} seats</p></div>
                       <div><p className="text-xs text-gray-500">AC Available</p><p className="text-sm">{selectedDriver.isAC ? 'Yes' : 'No'}</p></div>
                     </div>
+
+                    {/* Vehicle Document Images (RC Book & Vehicle Photo) */}
+                    {(() => {
+                      const vehicleImages = getDocumentImages(selectedDriver, 'vehicle');
+                      if (vehicleImages.length > 0) {
+                        return (
+                          <div className="mt-3">
+                            <p className="text-sm font-medium text-gray-700 mb-2">Vehicle Documents:</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {vehicleImages.map((img, idx) => (
+                                <div key={idx} className="border rounded-lg p-2 bg-gray-50">
+                                  <p className="text-xs text-gray-600 mb-1">{img.name}</p>
+                                  {!imageErrors[img.url] ? (
+                                    <img
+                                      src={getImageUrl(img.url)}
+                                      alt={img.name}
+                                      className="w-full h-32 object-cover rounded cursor-pointer hover:opacity-80"
+                                      onClick={() => openImageViewer(img.url, img.name)}
+                                      onError={() => handleImageError(img.url)}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-32 bg-gray-200 rounded flex items-center justify-center">
+                                      <p className="text-xs text-gray-500">Image not available</p>
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2 mt-2">
+                                    <button
+                                      onClick={() => openImageViewer(img.url, img.name)}
+                                      className="flex-1 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center justify-center gap-1"
+                                    >
+                                      <Eye className="w-3 h-3" /> View
+                                    </button>
+                                    <button
+                                      onClick={() => downloadImage(img.url, `${selectedDriver.name}_${img.name}.jpg`)}
+                                      className="flex-1 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 flex items-center justify-center gap-1"
+                                    >
+                                      <Download className="w-3 h-3" /> Download
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
 
-                  {/* Insurance & PUC */}
+                  {/* Insurance & PUC with Insurance Image below */}
                   <div className="mb-6">
                     <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                       <Shield className="w-5 h-5 text-orange-600" />
                       Insurance & PUC
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg mb-4">
                       <div><p className="text-xs text-gray-500">Insurance Number</p><p className="text-sm">{selectedDriver.insuranceNumber || 'N/A'}</p></div>
                       <div><p className="text-xs text-gray-500">Insurance Expiry</p><p className="text-sm">{selectedDriver.insuranceExpiry ? new Date(selectedDriver.insuranceExpiry).toLocaleDateString() : 'N/A'}</p></div>
                       <div><p className="text-xs text-gray-500">PUC Expiry</p><p className="text-sm">{selectedDriver.pucExpiry ? new Date(selectedDriver.pucExpiry).toLocaleDateString() : 'N/A'}</p></div>
                     </div>
+
+                    {/* Insurance Document Image */}
+                    {(() => {
+                      const insuranceImages = getDocumentImages(selectedDriver, 'insurance');
+                      if (insuranceImages.length > 0) {
+                        return (
+                          <div className="mt-3">
+                            <p className="text-sm font-medium text-gray-700 mb-2">Insurance Document:</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {insuranceImages.map((img, idx) => (
+                                <div key={idx} className="border rounded-lg p-2 bg-gray-50">
+                                  <p className="text-xs text-gray-600 mb-1">{img.name}</p>
+                                  {!imageErrors[img.url] ? (
+                                    <img
+                                      src={getImageUrl(img.url)}
+                                      alt={img.name}
+                                      className="w-full h-32 object-cover rounded cursor-pointer hover:opacity-80"
+                                      onClick={() => openImageViewer(img.url, img.name)}
+                                      onError={() => handleImageError(img.url)}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-32 bg-gray-200 rounded flex items-center justify-center">
+                                      <p className="text-xs text-gray-500">Image not available</p>
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2 mt-2">
+                                    <button
+                                      onClick={() => openImageViewer(img.url, img.name)}
+                                      className="flex-1 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center justify-center gap-1"
+                                    >
+                                      <Eye className="w-3 h-3" /> View
+                                    </button>
+                                    <button
+                                      onClick={() => downloadImage(img.url, `${selectedDriver.name}_${img.name}.jpg`)}
+                                      className="flex-1 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 flex items-center justify-center gap-1"
+                                    >
+                                      <Download className="w-3 h-3" /> Download
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </>
               )}
@@ -430,15 +663,13 @@ function DriverVerification() {
                     </div>
                   </div>
 
-                  {/* NO ID & License Documents for Goods Drivers */}
-
-                  {/* Goods Vehicle Information */}
+                  {/* Vehicle Information */}
                   <div className="mb-6">
                     <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                       <Truck className="w-5 h-5 text-green-600" />
                       Vehicle Information
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg mb-4">
                       <div><p className="text-xs text-gray-500">Vehicle Type</p><p className="text-sm font-medium">{selectedDriver.vehicleType || 'N/A'}</p></div>
                       <div><p className="text-xs text-gray-500">Registration Number</p><p className="text-sm">{selectedDriver.regNumber || 'N/A'}</p></div>
                       <div><p className="text-xs text-gray-500">Brand / Model</p><p className="text-sm">{selectedDriver.brand || 'N/A'} {selectedDriver.model || ''}</p></div>
@@ -449,74 +680,114 @@ function DriverVerification() {
                       <div><p className="text-xs text-gray-500">Permit Number</p><p className="text-sm">{selectedDriver.permitNumber || 'N/A'}</p></div>
                       <div><p className="text-xs text-gray-500">Vehicle Type ID</p><p className="text-sm">{selectedDriver.vehicleTypeId || 'N/A'}</p></div>
                     </div>
+
+                    {/* Vehicle Document Images (RC Book & Vehicle Photo) */}
+                    {(() => {
+                      const vehicleImages = getDocumentImages(selectedDriver, 'vehicle');
+                      if (vehicleImages.length > 0) {
+                        return (
+                          <div className="mt-3">
+                            <p className="text-sm font-medium text-gray-700 mb-2">Vehicle Documents:</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {vehicleImages.map((img, idx) => (
+                                <div key={idx} className="border rounded-lg p-2 bg-gray-50">
+                                  <p className="text-xs text-gray-600 mb-1">{img.name}</p>
+                                  {!imageErrors[img.url] ? (
+                                    <img
+                                      src={getImageUrl(img.url)}
+                                      alt={img.name}
+                                      className="w-full h-32 object-cover rounded cursor-pointer hover:opacity-80"
+                                      onClick={() => openImageViewer(img.url, img.name)}
+                                      onError={() => handleImageError(img.url)}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-32 bg-gray-200 rounded flex items-center justify-center">
+                                      <p className="text-xs text-gray-500">Image not available</p>
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2 mt-2">
+                                    <button
+                                      onClick={() => openImageViewer(img.url, img.name)}
+                                      className="flex-1 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center justify-center gap-1"
+                                    >
+                                      <Eye className="w-3 h-3" /> View
+                                    </button>
+                                    <button
+                                      onClick={() => downloadImage(img.url, `${selectedDriver.name}_${img.name}.jpg`)}
+                                      className="flex-1 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 flex items-center justify-center gap-1"
+                                    >
+                                      <Download className="w-3 h-3" /> Download
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
 
-                  {/* Insurance */}
+                  {/* Insurance with Insurance Image below */}
                   <div className="mb-6">
                     <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                       <Shield className="w-5 h-5 text-orange-600" />
                       Insurance
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg mb-4">
                       <div><p className="text-xs text-gray-500">Insurance Number</p><p className="text-sm">{selectedDriver.insuranceNumber || 'N/A'}</p></div>
                       <div><p className="text-xs text-gray-500">Insurance Expiry</p><p className="text-sm">{selectedDriver.insuranceExpiry ? new Date(selectedDriver.insuranceExpiry).toLocaleDateString() : 'N/A'}</p></div>
                     </div>
+
+                    {/* Insurance Document Image */}
+                    {(() => {
+                      const insuranceImages = getDocumentImages(selectedDriver, 'insurance');
+                      if (insuranceImages.length > 0) {
+                        return (
+                          <div className="mt-3">
+                            <p className="text-sm font-medium text-gray-700 mb-2">Insurance Document:</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {insuranceImages.map((img, idx) => (
+                                <div key={idx} className="border rounded-lg p-2 bg-gray-50">
+                                  <p className="text-xs text-gray-600 mb-1">{img.name}</p>
+                                  {!imageErrors[img.url] ? (
+                                    <img
+                                      src={getImageUrl(img.url)}
+                                      alt={img.name}
+                                      className="w-full h-32 object-cover rounded cursor-pointer hover:opacity-80"
+                                      onClick={() => openImageViewer(img.url, img.name)}
+                                      onError={() => handleImageError(img.url)}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-32 bg-gray-200 rounded flex items-center justify-center">
+                                      <p className="text-xs text-gray-500">Image not available</p>
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2 mt-2">
+                                    <button
+                                      onClick={() => openImageViewer(img.url, img.name)}
+                                      className="flex-1 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center justify-center gap-1"
+                                    >
+                                      <Eye className="w-3 h-3" /> View
+                                    </button>
+                                    <button
+                                      onClick={() => downloadImage(img.url, `${selectedDriver.name}_${img.name}.jpg`)}
+                                      className="flex-1 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 flex items-center justify-center gap-1"
+                                    >
+                                      <Download className="w-3 h-3" /> Download
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </>
-              )}
-
-              {/* Document Images - Common for both */}
-              {(selectedDriver.idFrontUrl || selectedDriver.dlFrontUrl || selectedDriver.rcPhotoUrl || selectedDriver.insurancePhotoUrl || selectedDriver.vehiclePhotoUrl) && (
-                <div className="mb-6">
-                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <Image className="w-5 h-5 text-purple-600" />
-                    Uploaded Documents
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {selectedDriver.idFrontUrl && (
-                      <div className="border rounded-lg p-2">
-                        <p className="text-xs font-medium text-gray-700 mb-1">ID Proof (Front)</p>
-                        <img src={selectedDriver.idFrontUrl} alt="ID Front" className="w-full h-32 object-cover rounded" />
-                      </div>
-                    )}
-                    {selectedDriver.idBackUrl && (
-                      <div className="border rounded-lg p-2">
-                        <p className="text-xs font-medium text-gray-700 mb-1">ID Proof (Back)</p>
-                        <img src={selectedDriver.idBackUrl} alt="ID Back" className="w-full h-32 object-cover rounded" />
-                      </div>
-                    )}
-                    {selectedDriver.dlFrontUrl && (
-                      <div className="border rounded-lg p-2">
-                        <p className="text-xs font-medium text-gray-700 mb-1">Driving License (Front)</p>
-                        <img src={selectedDriver.dlFrontUrl} alt="DL Front" className="w-full h-32 object-cover rounded" />
-                      </div>
-                    )}
-                    {selectedDriver.dlBackUrl && (
-                      <div className="border rounded-lg p-2">
-                        <p className="text-xs font-medium text-gray-700 mb-1">Driving License (Back)</p>
-                        <img src={selectedDriver.dlBackUrl} alt="DL Back" className="w-full h-32 object-cover rounded" />
-                      </div>
-                    )}
-                    {selectedDriver.rcPhotoUrl && (
-                      <div className="border rounded-lg p-2">
-                        <p className="text-xs font-medium text-gray-700 mb-1">RC Book</p>
-                        <img src={selectedDriver.rcPhotoUrl} alt="RC Book" className="w-full h-32 object-cover rounded" />
-                      </div>
-                    )}
-                    {selectedDriver.insurancePhotoUrl && (
-                      <div className="border rounded-lg p-2">
-                        <p className="text-xs font-medium text-gray-700 mb-1">Insurance Document</p>
-                        <img src={selectedDriver.insurancePhotoUrl} alt="Insurance" className="w-full h-32 object-cover rounded" />
-                      </div>
-                    )}
-                    {selectedDriver.vehiclePhotoUrl && (
-                      <div className="border rounded-lg p-2">
-                        <p className="text-xs font-medium text-gray-700 mb-1">Vehicle Photo</p>
-                        <img src={selectedDriver.vehiclePhotoUrl} alt="Vehicle" className="w-full h-32 object-cover rounded" />
-                      </div>
-                    )}
-                  </div>
-                </div>
               )}
 
               {/* Action Buttons */}
@@ -570,6 +841,42 @@ function DriverVerification() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Viewer Modal */}
+      {showImageModal && selectedImage && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-900">{selectedImage.name}</h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => downloadImage(selectedImage.url, selectedImage.name)}
+                  className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2 text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </button>
+                <button
+                  onClick={() => setShowImageModal(false)}
+                  className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-4 flex items-center justify-center bg-gray-900 min-h-[400px]">
+              <img
+                src={selectedImage.url}
+                alt={selectedImage.name}
+                className="max-w-full max-h-[70vh] object-contain"
+                onError={(e) => {
+                  e.target.src = 'https://via.placeholder.com/500x300?text=Image+Not+Available';
+                }}
+              />
             </div>
           </div>
         </div>
