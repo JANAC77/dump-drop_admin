@@ -1,6 +1,6 @@
 // RevenueReports.jsx - Complete Fixed Version
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     DollarSign,
     TrendingUp,
@@ -34,6 +34,8 @@ import {
 } from 'recharts';
 import { adminAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import jsPDF from 'jspdf';
+import autoTable from "jspdf-autotable";
 
 function RevenueReports() {
     const [loading, setLoading] = useState(true);
@@ -57,9 +59,7 @@ function RevenueReports() {
     });
     const [monthlyData, setMonthlyData] = useState([]);
     const [lastUpdated, setLastUpdated] = useState(new Date());
-    const [autoRefresh, setAutoRefresh] = useState(true);
     const [error, setError] = useState(null);
-    const intervalRef = useRef(null);
 
     const fetchRevenueData = useCallback(async (showToastMsg = false) => {
         setLoading(true);
@@ -72,10 +72,7 @@ function RevenueReports() {
             console.log('API Response:', response.data);
 
             if (response.data && response.data.success) {
-                // Set revenue trend data
                 setRevenueData(response.data.revenueData || []);
-
-                // Set summary stats - DIRECT from API
                 setSummary({
                     totalRevenue: response.data.summary?.totalRevenue || 0,
                     totalPayout: response.data.summary?.totalPayout || 0,
@@ -84,8 +81,6 @@ function RevenueReports() {
                     driverCommission: response.data.summary?.driverCommission || 80,
                     growth: response.data.summary?.growth || 0
                 });
-
-                // Set breakdown - DIRECT from API (this should show your correct values)
                 setBreakdown({
                     cabRevenue: response.data.breakdown?.cabRevenue || 0,
                     goodsRevenue: response.data.breakdown?.goodsRevenue || 0,
@@ -94,13 +89,8 @@ function RevenueReports() {
                     cabRides: response.data.breakdown?.cabRides || 0,
                     goodsRides: response.data.breakdown?.goodsRides || 0
                 });
-
                 setMonthlyData(response.data.monthlyData || []);
                 setLastUpdated(new Date());
-
-                console.log('Breakdown from API:', response.data.breakdown);
-                console.log('Cab Revenue:', response.data.breakdown?.cabRevenue);
-                console.log('Goods Revenue:', response.data.breakdown?.goodsRevenue);
 
                 if (showToastMsg) {
                     toast.success('Revenue data refreshed!');
@@ -143,24 +133,8 @@ function RevenueReports() {
         fetchRevenueData(false);
     }, [period, fetchRevenueData]);
 
-    useEffect(() => {
-        if (autoRefresh) {
-            intervalRef.current = setInterval(() => {
-                fetchRevenueData(false);
-            }, 30000);
-        }
-        return () => {
-            if (intervalRef.current) clearInterval(intervalRef.current);
-        };
-    }, [autoRefresh, fetchRevenueData]);
-
     const handleManualRefresh = () => {
         fetchRevenueData(true);
-    };
-
-    const toggleAutoRefresh = () => {
-        setAutoRefresh(!autoRefresh);
-        toast.info(autoRefresh ? 'Auto-refresh stopped' : 'Auto-refresh started');
     };
 
     const formatCurrency = (amount) => {
@@ -171,24 +145,105 @@ function RevenueReports() {
         return (num || 0).toLocaleString();
     };
 
-    const handleExport = async () => {
-        try {
-            const response = await adminAPI.exportRevenueReport(period);
-            const blob = new Blob([response.data], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `revenue_report_${period}_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-            toast.success('Report exported successfully');
-        } catch (error) {
-            console.error('Export error:', error);
-            toast.error('Failed to export report');
+    const exportToPDF = () => {
+        const doc = new jsPDF("p", "mm", "a4");
+        const date = new Date().toLocaleString();
+        const pageWidth = doc.internal.pageSize.getWidth();
+
+        doc.setFillColor(41, 98, 255);
+        doc.rect(0, 0, pageWidth, 22, "F");
+        doc.setTextColor(255);
+        doc.setFontSize(16);
+        doc.text("Revenue Report", pageWidth / 2, 11, { align: "center" });
+        doc.setFontSize(9);
+        doc.text(`Generated: ${date}`, pageWidth / 2, 17, { align: "center" });
+        doc.text(`Period: ${period.toUpperCase()}`, pageWidth / 2, 21, { align: "center" });
+
+        doc.setTextColor(0, 0, 0);
+        let yPos = 35;
+
+        doc.setFontSize(14);
+        doc.text("Summary Statistics", 14, yPos);
+        yPos += 8;
+
+        const summaryData = [
+            ["Total Revenue", formatCurrency(summary.totalRevenue)],
+            ["Total Driver Payouts", formatCurrency(summary.totalPayout)],
+            ["Total Completed Rides", formatNumber(summary.totalRides)],
+            ["Average Revenue Per Ride", formatCurrency(summary.avgRevenuePerRide)],
+            ["Driver Commission Rate", `${summary.driverCommission}%`],
+            ["Growth", `${summary.growth >= 0 ? '+' : ''}${summary.growth}%`]
+        ];
+
+        autoTable(doc, {
+            startY: yPos,
+            body: summaryData,
+            theme: "grid",
+            styles: { fontSize: 10, cellPadding: 4 },
+            columnStyles: {
+                0: { fontStyle: "bold", cellWidth: 70 },
+                1: { halign: "right", cellWidth: 70 }
+            }
+        });
+        yPos = doc.lastAutoTable.finalY + 10;
+
+        if (yPos > 250) {
+            doc.addPage();
+            yPos = 20;
         }
+
+        doc.setFontSize(14);
+        doc.text("Revenue Breakdown", 14, yPos);
+        yPos += 8;
+
+        const breakdownData = [
+            ["Cab Revenue", formatCurrency(breakdown.cabRevenue), `${breakdown.cabPercentage.toFixed(1)}%`],
+            ["Goods Revenue", formatCurrency(breakdown.goodsRevenue), `${breakdown.goodsPercentage.toFixed(1)}%`],
+            ["Cab Rides", formatNumber(breakdown.cabRides), ""],
+            ["Goods Deliveries", formatNumber(breakdown.goodsRides), ""]
+        ];
+
+        autoTable(doc, {
+            startY: yPos,
+            head: [["Service", "Revenue", "Percentage"]],
+            body: breakdownData,
+            theme: "striped",
+            headStyles: { fillColor: [41, 98, 255], textColor: 255 },
+            styles: { fontSize: 10, cellPadding: 4 }
+        });
+        yPos = doc.lastAutoTable.finalY + 10;
+
+        if (revenueData.length > 0) {
+            if (yPos > 250) {
+                doc.addPage();
+                yPos = 20;
+            }
+
+            doc.setFontSize(14);
+            doc.text("Revenue Trend", 14, yPos);
+            yPos += 8;
+
+            const trendData = revenueData.map(item => [
+                item.name || 'N/A',
+                formatCurrency(item.revenue || 0),
+                formatNumber(item.rides || 0)
+            ]);
+
+            autoTable(doc, {
+                startY: yPos,
+                head: [["Period", "Revenue", "Rides"]],
+                body: trendData,
+                theme: "striped",
+                headStyles: { fillColor: [41, 98, 255], textColor: 255 },
+                styles: { fontSize: 9, cellPadding: 3 }
+            });
+        }
+
+        doc.save(`revenue_report_${period}_${new Date().toISOString().split("T")[0]}.pdf`);
+        toast.success("PDF downloaded successfully");
     };
 
-    // Prepare pie chart data - USE DIRECT VALUES FROM API
+    // Prepare pie chart data - DEFINE pieData HERE
     const pieData = [
         { name: 'Cab Rides', value: breakdown.cabRevenue, color: '#3b82f6' },
         { name: 'Goods Delivery', value: breakdown.goodsRevenue, color: '#10b981' }
@@ -214,27 +269,13 @@ function RevenueReports() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Revenue Reports</h1>
-                    <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
-                        Track platform revenue and driver payouts
-                        <span className="inline-flex items-center gap-1 text-xs text-green-600">
-                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                            Live Data
-                        </span>
-                    </p>
+                    <p className="text-sm text-gray-500 mt-1">Track platform revenue and driver payouts</p>
                 </div>
                 <div className="flex gap-3 flex-wrap">
                     <div className="flex items-center text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
                         <Eye className="w-3 h-3 mr-1" />
                         Updated: {lastUpdated.toLocaleTimeString()}
                     </div>
-
-                    <button
-                        onClick={toggleAutoRefresh}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${autoRefresh ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
-                    >
-                        <span className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
-                        {autoRefresh ? 'Live ON' : 'Live OFF'}
-                    </button>
 
                     <select
                         value={period}
@@ -256,11 +297,11 @@ function RevenueReports() {
                     </button>
 
                     <button
-                        onClick={handleExport}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition flex items-center gap-2"
+                        onClick={exportToPDF}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition flex items-center gap-2"
                     >
                         <Download className="w-4 h-4" />
-                        Export
+                        Export PDF
                     </button>
                 </div>
             </div>
@@ -282,7 +323,7 @@ function RevenueReports() {
                 </div>
             )}
 
-            {/* Stats Cards - Show Total Revenue */}
+            {/* Stats Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                     <div className="flex items-center justify-between mb-2">
@@ -322,7 +363,7 @@ function RevenueReports() {
                 </div>
             </div>
 
-            {/* Revenue Breakdown Cards - SHOW CAB AND GOODS REVENUE SEPARATELY */}
+            {/* Revenue Breakdown Cards */}
             <div className="grid grid-cols-2 gap-4">
                 <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl p-4 text-white">
                     <div className="flex items-center justify-between">
@@ -505,19 +546,9 @@ function RevenueReports() {
                 </div>
             )}
 
-            {/* Live Status Bar */}
+            {/* Last Updated Status */}
             <div className="text-center text-xs text-gray-400 bg-gray-50 py-2 rounded-lg">
-                {autoRefresh ? (
-                    <span className="inline-flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                        Live data • Auto-refreshing every 30 seconds • Last updated: {lastUpdated.toLocaleTimeString()}
-                    </span>
-                ) : (
-                    <span className="inline-flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
-                        Auto-refresh OFF • Click Refresh to update
-                    </span>
-                )}
+                Last updated: {lastUpdated.toLocaleTimeString()}
             </div>
         </div>
     );

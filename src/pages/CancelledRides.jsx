@@ -5,7 +5,6 @@ import {
     Eye,
     Download,
     RefreshCw,
-    Filter,
     X,
     User,
     MapPin,
@@ -14,11 +13,12 @@ import {
     Clock,
     Car,
     Truck,
-    AlertCircle,
-    MessageCircle
+    AlertCircle
 } from 'lucide-react';
 import { adminAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import jsPDF from 'jspdf';
+import autoTable from "jspdf-autotable";
 
 function CancelledRides() {
     const [rides, setRides] = useState([]);
@@ -32,6 +32,7 @@ function CancelledRides() {
     const [stats, setStats] = useState({
         total: 0,
         totalAmount: 0,
+        rentalAmount: 0,
         byDriver: 0,
         byCustomer: 0,
         byAdmin: 0
@@ -59,14 +60,23 @@ function CancelledRides() {
             const response = await adminAPI.getCancelledRides(params);
 
             if (response.data.success) {
-                setRides(response.data.rides);
-                setStats(response.data.stats);
-                setTotalPages(response.data.pages);
+                console.log('Cancelled rides response:', response.data);
+                setRides(response.data.rides || []);
+                setStats(response.data.stats || {
+                    total: 0,
+                    totalAmount: 0,
+                    rentalAmount: 0,
+                    byDriver: 0,
+                    byCustomer: 0,
+                    byAdmin: 0
+                });
+                setTotalPages(response.data.pages || 1);
+            } else {
+                setMockData();
             }
         } catch (error) {
             console.error('Error fetching cancelled rides:', error);
             toast.error('Failed to load cancelled rides');
-            // Set mock data for demo
             setMockData();
         } finally {
             setLoading(false);
@@ -83,10 +93,13 @@ function CancelledRides() {
                 fromCity: 'Airport',
                 toCity: 'City Center',
                 amount: 350,
+                rentalAmount: 0,
+                isRental: false,
                 cancelledBy: 'customer',
                 cancelReason: 'Changed plans',
                 cancelledAt: new Date(),
-                createdAt: new Date()
+                createdAt: new Date(),
+                passengerDetails: [{ name: 'John Doe', phone: '9876543210' }]
             },
             {
                 _id: 'RIDE002',
@@ -96,41 +109,192 @@ function CancelledRides() {
                 fromCity: 'Warehouse A',
                 toCity: 'Mall B',
                 amount: 1200,
+                rentalAmount: 0,
+                isRental: false,
                 cancelledBy: 'driver',
                 cancelReason: 'Vehicle issue',
                 cancelledAt: new Date(),
-                createdAt: new Date()
+                createdAt: new Date(),
+                passengerDetails: []
+            },
+            {
+                _id: 'RIDE003',
+                rideType: 'cab',
+                customer: { name: 'Amit Patel', phone: '9876543214' },
+                driver: { name: 'Rahul Mehta', phone: '9876543215' },
+                fromCity: 'Ahmedabad',
+                toCity: 'Vadodara',
+                amount: 0,
+                rentalAmount: 2500,
+                isRental: true,
+                cancelledBy: 'admin',
+                cancelReason: 'Admin cancelled',
+                cancelledAt: new Date(),
+                createdAt: new Date(),
+                passengerDetails: [{ name: 'Amit Patel', phone: '9876543214' }]
             }
         ]);
         setStats({
-            total: 45,
-            totalAmount: 18500,
-            byDriver: 15,
-            byCustomer: 25,
-            byAdmin: 5
+            total: 3,
+            totalAmount: 1550,
+            rentalAmount: 2500,
+            byDriver: 1,
+            byCustomer: 1,
+            byAdmin: 1
         });
     };
 
+    const exportToPDF = () => {
+        const doc = new jsPDF("p", "mm", "a4");
+        const date = new Date().toLocaleString();
+
+        doc.setFillColor(41, 98, 255);
+        doc.rect(0, 0, 210, 22, "F");
+        doc.setTextColor(255);
+        doc.setFontSize(16);
+        doc.text("Cancelled Rides Report", 105, 11, { align: "center" });
+        doc.setFontSize(9);
+        doc.text(`Generated: ${date}`, 105, 17, { align: "center" });
+
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(12);
+        doc.text("Statistics Summary", 14, 35);
+
+        const statsData = [
+            ["Total Cancelled Rides", stats.total],
+            ["Total Lost Revenue", formatCurrency(stats.totalAmount)],
+            ["Rental Revenue Lost", formatCurrency(stats.rentalAmount)],
+            ["Cancelled by Customer", stats.byCustomer],
+            ["Cancelled by Driver", stats.byDriver],
+            ["Cancelled by Admin", stats.byAdmin]
+        ];
+
+        autoTable(doc, {
+            startY: 42,
+            body: statsData,
+            theme: "grid",
+            styles: { fontSize: 10, cellPadding: 4 },
+            columnStyles: {
+                0: { fontStyle: "bold", cellWidth: 80 },
+                1: { halign: "right", cellWidth: 80 }
+            }
+        });
+
+        const tableData = rides.map((ride, i) => {
+            let cancelledByLabel = 'Unknown';
+            if (ride.cancelledBy === 'customer') cancelledByLabel = 'Customer';
+            else if (ride.cancelledBy === 'driver') cancelledByLabel = 'Driver';
+            else if (ride.cancelledBy === 'admin') cancelledByLabel = 'Admin';
+
+            return [
+                i + 1,
+                ride._id?.slice(-8) || 'N/A',
+                ride.rideType === 'cab' ? 'Cab' : 'Goods',
+                getCustomerName(ride),
+                getDriverName(ride),
+                `${ride.fromCity || 'N/A'} → ${ride.toCity || 'N/A'}`,
+                formatCurrency(ride.amount || 0),
+                ride.isRental ? formatCurrency(ride.rentalAmount) : '-',
+                cancelledByLabel,
+                new Date(ride.cancelledAt || ride.createdAt).toLocaleDateString()
+            ];
+        });
+
+        autoTable(doc, {
+            startY: doc.lastAutoTable.finalY + 10,
+            head: [["No", "ID", "Type", "Customer", "Driver", "Route", "Amount", "Rental Amount", "Cancelled By", "Date"]],
+            body: tableData,
+            theme: "striped",
+            styles: { fontSize: 7.5, cellPadding: 2.5, valign: "middle" },
+            headStyles: { fillColor: [41, 98, 255], textColor: 255, halign: "center", fontStyle: "bold" },
+            columnStyles: {
+                0: { cellWidth: 10, halign: "center" },
+                1: { cellWidth: 18 },
+                2: { cellWidth: 12, halign: "center" },
+                3: { cellWidth: 25 },
+                4: { cellWidth: 25 },
+                5: { cellWidth: 35 },
+                6: { cellWidth: 18, halign: "right" },
+                7: { cellWidth: 22, halign: "right" },
+                8: { cellWidth: 20, halign: "center" },
+                9: { cellWidth: 20, halign: "center" }
+            },
+            didDrawPage: () => {
+                doc.setFontSize(8);
+                doc.setTextColor(150);
+                doc.text(`Page ${doc.internal.getNumberOfPages()}`, 200, 290, { align: "right" });
+            }
+        });
+
+        doc.save(`cancelled_rides_report_${new Date().toISOString().split("T")[0]}.pdf`);
+        toast.success("PDF downloaded successfully");
+    };
+
+    const getCustomerName = (ride) => {
+        if (ride.rideType === 'cab') {
+            if (ride.passengerDetails && ride.passengerDetails.length > 0) {
+                return ride.passengerDetails[0].name || ride.customer?.name || 'N/A';
+            }
+            return ride.customer?.name || 'N/A';
+        }
+        return ride.customer?.name || 'N/A';
+    };
+
+    const getCustomerPhone = (ride) => {
+        if (ride.rideType === 'cab') {
+            if (ride.passengerDetails && ride.passengerDetails.length > 0) {
+                return ride.passengerDetails[0].phone || ride.customer?.phone || 'N/A';
+            }
+            return ride.customer?.phone || 'N/A';
+        }
+        return ride.customer?.phone || 'N/A';
+    };
+
+    const getDriverName = (ride) => {
+        return ride.driver?.name || 'N/A';
+    };
+
+    const getDriverPhone = (ride) => {
+        return ride.driver?.phone || 'N/A';
+    };
+
     const getCancelledByBadge = (cancelledBy) => {
-        const config = {
-            customer: { color: 'bg-yellow-100 text-yellow-700', label: 'By Customer' },
-            driver: { color: 'bg-orange-100 text-orange-700', label: 'By Driver' },
-            admin: { color: 'bg-red-100 text-red-700', label: 'By Admin' }
-        };
-        const c = config[cancelledBy] || config.customer;
-        return (
-            <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${c.color}`}>
-                {c.label}
-            </span>
-        );
+        const by = String(cancelledBy || '').toLowerCase();
+        
+        if (by === 'customer') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">
+                    By Customer
+                </span>
+            );
+        } else if (by === 'driver') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-700">
+                    By Driver
+                </span>
+            );
+        } else if (by === 'admin') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-700">
+                    By Admin
+                </span>
+            );
+        } else {
+            return (
+                <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
+                    Unknown
+                </span>
+            );
+        }
     };
 
     const formatDate = (date) => {
+        if (!date) return 'N/A';
         return new Date(date).toLocaleString();
     };
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount || 0);
     };
 
     const handleSearch = (e) => {
@@ -146,29 +310,7 @@ function CancelledRides() {
         setSelectedReason('all');
         setDateRange({ start: '', end: '' });
         setCurrentPage(1);
-    };
-
-    const handleExport = async () => {
-        try {
-            const response = await adminAPI.exportCancelledRides({
-                type: selectedType,
-                reason: selectedReason,
-                startDate: dateRange.start,
-                endDate: dateRange.end,
-                search: searchTerm
-            });
-
-            const blob = new Blob([response.data], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `cancelled_rides_${new Date().toISOString()}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-            toast.success('Report exported successfully');
-        } catch (error) {
-            toast.error('Failed to export');
-        }
+        fetchCancelledRides();
     };
 
     if (loading && rides.length === 0) {
@@ -189,11 +331,11 @@ function CancelledRides() {
                 </div>
                 <div className="flex gap-3">
                     <button
-                        onClick={handleExport}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition flex items-center gap-2"
+                        onClick={exportToPDF}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition flex items-center gap-2"
                     >
                         <Download className="w-4 h-4" />
-                        Export
+                        Export PDF
                     </button>
                     <button
                         onClick={fetchCancelledRides}
@@ -206,7 +348,7 @@ function CancelledRides() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
                 <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                     <div className="flex items-center gap-2 mb-2">
                         <XCircle className="w-5 h-5 text-red-600" />
@@ -223,6 +365,13 @@ function CancelledRides() {
                 </div>
                 <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                     <div className="flex items-center gap-2 mb-2">
+                        <Calendar className="w-5 h-5 text-teal-600" />
+                        <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.rentalAmount)}</p>
+                    </div>
+                    <p className="text-xs text-gray-500">Rental Revenue Lost</p>
+                </div>
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                    <div className="flex items-center gap-2 mb-2">
                         <User className="w-5 h-5 text-yellow-600" />
                         <p className="text-2xl font-bold text-gray-900">{stats.byCustomer}</p>
                     </div>
@@ -234,6 +383,13 @@ function CancelledRides() {
                         <p className="text-2xl font-bold text-gray-900">{stats.byDriver}</p>
                     </div>
                     <p className="text-xs text-gray-500">Cancelled by Driver</p>
+                </div>
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                    <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="w-5 h-5 text-red-600" />
+                        <p className="text-2xl font-bold text-gray-900">{stats.byAdmin}</p>
+                    </div>
+                    <p className="text-xs text-gray-500">Cancelled by Admin</p>
                 </div>
             </div>
 
@@ -303,7 +459,7 @@ function CancelledRides() {
             {/* Cancelled Rides Table */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="w-full min-w-[1200px]">
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ride ID</th>
@@ -312,6 +468,7 @@ function CancelledRides() {
                                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Driver</th>
                                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Route</th>
                                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rental Amount</th>
                                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cancelled By</th>
                                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                                 <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -320,64 +477,76 @@ function CancelledRides() {
                         <tbody className="divide-y divide-gray-100">
                             {rides.length === 0 ? (
                                 <tr>
-                                    <td colSpan="9" className="px-5 py-10 text-center text-gray-500">
+                                    <td colSpan="10" className="px-5 py-10 text-center text-gray-500">
                                         No cancelled rides found
                                     </td>
                                 </tr>
                             ) : (
-                                rides.map((ride) => (
-                                    <tr key={ride._id} className="hover:bg-gray-50 transition">
-                                        <td className="px-5 py-3">
-                                            <p className="text-sm font-medium text-gray-900">#{ride._id?.slice(-8)}</p>
-                                        </td>
-                                        <td className="px-5 py-3">
-                                            <div className="flex items-center gap-1">
-                                                {ride.rideType === 'cab' ?
-                                                    <Car className="w-4 h-4 text-blue-600" /> :
-                                                    <Truck className="w-4 h-4 text-green-600" />
-                                                }
-                                                <span className="text-sm text-gray-600">
-                                                    {ride.rideType === 'cab' ? 'Cab' : 'Goods'}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-5 py-3">
-                                            <div>
-                                                <p className="text-sm font-medium text-gray-900">{ride.customer?.name || 'N/A'}</p>
-                                                <p className="text-xs text-gray-500">{ride.customer?.phone || 'N/A'}</p>
-                                            </div>
-                                        </td>
-                                        <td className="px-5 py-3">
-                                            <div>
-                                                <p className="text-sm text-gray-900">{ride.driver?.name || 'N/A'}</p>
-                                                <p className="text-xs text-gray-500">{ride.driver?.phone || 'N/A'}</p>
-                                            </div>
-                                        </td>
-                                        <td className="px-5 py-3">
-                                            <div className="flex items-center gap-1">
-                                                <MapPin className="w-3 h-3 text-gray-400" />
-                                                <span className="text-sm text-gray-600">{ride.fromCity || 'N/A'}</span>
-                                                <span className="text-gray-400">→</span>
-                                                <span className="text-sm text-gray-600">{ride.toCity || 'N/A'}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-5 py-3 text-sm font-semibold text-gray-900">{formatCurrency(ride.amount)}</td>
-                                        <td className="px-5 py-3">{getCancelledByBadge(ride.cancelledBy)}</td>
-                                        <td className="px-5 py-3 text-sm text-gray-500">{formatDate(ride.cancelledAt || ride.createdAt)}</td>
-                                        <td className="px-5 py-3">
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedRide(ride);
-                                                    setShowModal(true);
-                                                }}
-                                                className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                                                title="View Details"
-                                            >
-                                                <Eye className="w-4 h-4" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
+                                rides.map((ride) => {
+                                    return (
+                                        <tr key={ride._id} className="hover:bg-gray-50 transition">
+                                            <td className="px-5 py-3">
+                                                <p className="text-sm font-medium text-gray-900">#{ride._id?.slice(-8)}</p>
+                                                {ride.isRental && (
+                                                    <span className="text-[10px] bg-teal-100 text-teal-700 px-1 rounded ml-1">Rental</span>
+                                                )}
+                                            </td>
+                                            <td className="px-5 py-3">
+                                                <div className="flex items-center gap-1">
+                                                    {ride.rideType === 'cab' ?
+                                                        <Car className="w-4 h-4 text-blue-600" /> :
+                                                        <Truck className="w-4 h-4 text-green-600" />
+                                                    }
+                                                    <span className="text-sm text-gray-600">
+                                                        {ride.rideType === 'cab' ? 'Cab' : 'Goods'}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-5 py-3">
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-900">{getCustomerName(ride)}</p>
+                                                    <p className="text-xs text-gray-500">{getCustomerPhone(ride)}</p>
+                                                </div>
+                                            </td>
+                                            <td className="px-5 py-3">
+                                                <div>
+                                                    <p className="text-sm text-gray-900">{getDriverName(ride)}</p>
+                                                    <p className="text-xs text-gray-500">{getDriverPhone(ride)}</p>
+                                                </div>
+                                            </td>
+                                            <td className="px-5 py-3">
+                                                <div className="flex items-center gap-1">
+                                                    <MapPin className="w-3 h-3 text-gray-400" />
+                                                    <span className="text-sm text-gray-600">{ride.fromCity || 'N/A'}</span>
+                                                    <span className="text-gray-400">→</span>
+                                                    <span className="text-sm text-gray-600">{ride.toCity || 'N/A'}</span>
+                                                </div>
+                                            </td>
+                                            {/* Amount Column - Shows ride amount */}
+                                            <td className="px-5 py-3 text-sm font-semibold text-gray-900">
+                                                {formatCurrency(ride.amount || 0)}
+                                            </td>
+                                            {/* Rental Amount Column - Shows rental amount for rentals */}
+                                            <td className="px-5 py-3 text-sm font-semibold text-teal-600">
+                                                {ride.isRental ? formatCurrency(ride.rentalAmount) : '-'}
+                                            </td>
+                                            <td className="px-5 py-3">{getCancelledByBadge(ride.cancelledBy)}</td>
+                                            <td className="px-5 py-3 text-sm text-gray-500">{formatDate(ride.cancelledAt || ride.createdAt)}</td>
+                                            <td className="px-5 py-3">
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedRide(ride);
+                                                        setShowModal(true);
+                                                    }}
+                                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                                    title="View Details"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
@@ -419,7 +588,6 @@ function CancelledRides() {
                         </div>
 
                         <div className="p-5 space-y-4">
-                            {/* Warning Banner */}
                             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                                 <div className="flex items-center gap-2 mb-2">
                                     <AlertCircle className="w-5 h-5 text-red-600" />
@@ -430,7 +598,6 @@ function CancelledRides() {
                                 </p>
                             </div>
 
-                            {/* Cancellation Details */}
                             <div className="border border-gray-200 rounded-lg p-4">
                                 <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                                     <XCircle className="w-4 h-4 text-red-600" />
@@ -454,7 +621,6 @@ function CancelledRides() {
                                 </div>
                             </div>
 
-                            {/* Ride Details */}
                             <div className="border border-gray-200 rounded-lg p-4">
                                 <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
                                     <MapPin className="w-4 h-4 text-blue-600" />
@@ -464,20 +630,22 @@ function CancelledRides() {
                                     <p className="text-sm"><span className="text-gray-500">From:</span> {selectedRide.fromCity || 'N/A'}</p>
                                     <p className="text-sm"><span className="text-gray-500">To:</span> {selectedRide.toCity || 'N/A'}</p>
                                     <p className="text-sm"><span className="text-gray-500">Amount:</span> {formatCurrency(selectedRide.amount)}</p>
+                                    {selectedRide.isRental && selectedRide.rentalAmount > 0 && (
+                                        <p className="text-sm"><span className="text-gray-500">Rental Amount:</span> {formatCurrency(selectedRide.rentalAmount)}</p>
+                                    )}
                                 </div>
                             </div>
 
-                            {/* Customer & Driver Details */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="border border-gray-200 rounded-lg p-3">
                                     <h4 className="font-semibold text-gray-900 mb-1 text-sm">Customer</h4>
-                                    <p className="text-sm">{selectedRide.customer?.name || 'N/A'}</p>
-                                    <p className="text-xs text-gray-500">{selectedRide.customer?.phone || 'N/A'}</p>
+                                    <p className="text-sm">{getCustomerName(selectedRide)}</p>
+                                    <p className="text-xs text-gray-500">{getCustomerPhone(selectedRide)}</p>
                                 </div>
                                 <div className="border border-gray-200 rounded-lg p-3">
                                     <h4 className="font-semibold text-gray-900 mb-1 text-sm">Driver</h4>
-                                    <p className="text-sm">{selectedRide.driver?.name || 'N/A'}</p>
-                                    <p className="text-xs text-gray-500">{selectedRide.driver?.phone || 'N/A'}</p>
+                                    <p className="text-sm">{getDriverName(selectedRide)}</p>
+                                    <p className="text-xs text-gray-500">{getDriverPhone(selectedRide)}</p>
                                 </div>
                             </div>
                         </div>

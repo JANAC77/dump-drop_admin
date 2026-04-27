@@ -16,17 +16,13 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 function Dashboard() {
-  // All stats with default values (0 to avoid undefined errors)
   const [stats, setStats] = useState({
-    // User Stats
     totalUsers: 0,
     totalCustomers: 0,
     totalDrivers: 0,
     activeUsers: 0,
     newUsersThisMonth: 0,
     userGrowth: 0,
-    
-    // Ride Stats
     totalRides: 0,
     totalCabRides: 0,
     totalGoodsRides: 0,
@@ -37,8 +33,6 @@ function Dashboard() {
     draftRides: 0,
     completionRate: 0,
     rideGrowth: 0,
-    
-    // Revenue Stats
     totalRevenue: 0,
     cabRevenue: 0,
     goodsRevenue: 0,
@@ -46,8 +40,6 @@ function Dashboard() {
     thisMonthRevenue: 0,
     platformCommission: 0,
     revenueGrowth: 0,
-    
-    // Driver Stats
     totalApprovedDrivers: 0,
     totalPendingDrivers: 0,
     totalRejectedDrivers: 0,
@@ -56,8 +48,6 @@ function Dashboard() {
     approvedGoodsDrivers: 0,
     pendingGoodsDrivers: 0,
     onlineDrivers: 0,
-    
-    // Booking & Payment Stats
     totalBookings: 0,
     totalPayments: 0,
     pendingPayments: 0,
@@ -66,37 +56,31 @@ function Dashboard() {
   });
   
   const [revenueData, setRevenueData] = useState([]);
-  const [chartSummary, setChartSummary] = useState({});
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('week');
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const intervalRef = useRef(null);
 
   const fetchDashboardData = useCallback(async (showToastMsg = false) => {
     try {
+      console.log('Fetching dashboard data for period:', period);
+      
       const [statsRes, revenueRes] = await Promise.all([
         adminAPI.getDashboardStats(),
         adminAPI.getRevenueData(period)
       ]);
 
-      console.log('Dashboard Data:', statsRes.data);
-      console.log('Revenue Data:', revenueRes.data);
+      console.log('Dashboard Stats Response:', statsRes.data);
+      console.log('Revenue Data Response:', revenueRes.data);
 
-      // Safely extract data with fallbacks
+      // Process stats data
       const statsData = statsRes.data?.data || statsRes.data || {};
-      
-      // Update stats with safe values (using || 0 to prevent undefined)
       setStats({
-        // User Stats
         totalUsers: statsData.totalUsers || 0,
         totalCustomers: statsData.totalCustomers || 0,
         totalDrivers: statsData.totalDrivers || 0,
         activeUsers: statsData.activeUsers || 0,
         newUsersThisMonth: statsData.newUsersThisMonth || 0,
         userGrowth: statsData.userGrowth || 0,
-        
-        // Ride Stats
         totalRides: statsData.totalRides || 0,
         totalCabRides: statsData.totalCabRides || 0,
         totalGoodsRides: statsData.totalGoodsRides || 0,
@@ -107,8 +91,6 @@ function Dashboard() {
         draftRides: statsData.draftRides || 0,
         completionRate: statsData.completionRate || 0,
         rideGrowth: statsData.rideGrowth || 0,
-        
-        // Revenue Stats
         totalRevenue: statsData.totalRevenue || 0,
         cabRevenue: statsData.cabRevenue || 0,
         goodsRevenue: statsData.goodsRevenue || 0,
@@ -116,8 +98,6 @@ function Dashboard() {
         thisMonthRevenue: statsData.thisMonthRevenue || 0,
         platformCommission: statsData.platformCommission || 0,
         revenueGrowth: statsData.revenueGrowth || 0,
-        
-        // Driver Stats
         totalApprovedDrivers: statsData.totalApprovedDrivers || 0,
         totalPendingDrivers: statsData.totalPendingDrivers || 0,
         totalRejectedDrivers: statsData.totalRejectedDrivers || 0,
@@ -126,8 +106,6 @@ function Dashboard() {
         approvedGoodsDrivers: statsData.approvedGoodsDrivers || 0,
         pendingGoodsDrivers: statsData.pendingGoodsDrivers || 0,
         onlineDrivers: statsData.onlineDrivers || 0,
-        
-        // Booking & Payment Stats
         totalBookings: statsData.totalBookings || 0,
         totalPayments: statsData.totalPayments || 0,
         pendingPayments: statsData.pendingPayments || 0,
@@ -135,14 +113,22 @@ function Dashboard() {
         driverCommission: statsData.driverCommission || 80
       });
       
-      const revenueArray = revenueRes.data?.data || revenueRes.data || [];
-      setRevenueData(revenueArray);
-      setChartSummary(revenueRes.data?.summary || {});
+      // Process revenue data - handle different response structures
+      let revenueArray = [];
+      if (revenueRes.data?.data && Array.isArray(revenueRes.data.data)) {
+        revenueArray = revenueRes.data.data;
+      } else if (revenueRes.data && Array.isArray(revenueRes.data)) {
+        revenueArray = revenueRes.data;
+      } else if (revenueRes.data?.revenueData && Array.isArray(revenueRes.data.revenueData)) {
+        revenueArray = revenueRes.data.revenueData;
+      }
       
+      console.log('Processed revenue array:', revenueArray);
+      setRevenueData(revenueArray);
       setLastUpdated(new Date());
       
       if (showToastMsg) {
-        toast.success('Dashboard updated with latest data!');
+        toast.success('Dashboard updated!');
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -156,26 +142,20 @@ function Dashboard() {
 
   useEffect(() => {
     fetchDashboardData(false);
-  }, [period]);
-
-  useEffect(() => {
-    if (autoRefresh) {
-      intervalRef.current = setInterval(() => {
-        fetchDashboardData(false);
-      }, 15000);
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [autoRefresh, fetchDashboardData]);
+  }, [period, fetchDashboardData]);
 
   const handleManualRefresh = () => fetchDashboardData(true);
-  const toggleAutoRefresh = () => {
-    setAutoRefresh(!autoRefresh);
-    toast.info(autoRefresh ? 'Auto-refresh stopped' : 'Auto-refresh started');
+
+  const formatCurrency = (amount) => {
+    const num = amount || 0;
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(num);
   };
 
-  // Pie chart data with safe values
+  const formatNumber = (num) => {
+    return (num || 0).toLocaleString();
+  };
+
+  // Prepare pie chart data (only show if data exists)
   const rideTypePieData = [
     { name: 'Cab Rides', value: stats.totalCabRides || 0, color: '#3b82f6' },
     { name: 'Goods Delivery', value: stats.totalGoodsRides || 0, color: '#10b981' }
@@ -194,21 +174,11 @@ function Dashboard() {
     { name: 'Cancelled', value: stats.cancelledRides || 0, color: '#ef4444' }
   ].filter(item => item.value > 0);
 
-  const formatCurrency = (amount) => {
-    const num = amount || 0;
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(num);
-  };
-
-  const formatNumber = (num) => {
-    return (num || 0).toLocaleString();
-  };
-
   const exportToPDF = () => {
     const doc = new jsPDF('p', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
     let yPos = 20;
 
-    // Header
     doc.setFillColor(59, 130, 246);
     doc.rect(0, 0, pageWidth, 25, 'F');
     doc.setTextColor(255, 255, 255);
@@ -246,6 +216,11 @@ function Dashboard() {
     yPos = doc.lastAutoTable.finalY + 10;
     
     // Ride Stats
+    if (yPos > 250) {
+      doc.addPage();
+      yPos = 20;
+    }
+    
     doc.setFontSize(14);
     doc.text('Ride Statistics', 14, yPos);
     yPos += 8;
@@ -287,7 +262,6 @@ function Dashboard() {
       ['Goods Revenue', formatCurrency(stats.goodsRevenue)],
       ['Today\'s Revenue', formatCurrency(stats.todayRevenue)],
       ['This Month Revenue', formatCurrency(stats.thisMonthRevenue)],
-      ['Platform Commission', formatCurrency(stats.platformCommission)],
       ['Revenue Growth', `${stats.revenueGrowth || 0}%`]
     ];
     
@@ -348,23 +322,13 @@ function Dashboard() {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
-            Complete platform analytics
-            <span className="inline-flex items-center gap-1 text-xs text-green-600">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-              Live Data
-            </span>
-          </p>
+          <p className="text-sm text-gray-500 mt-1">Complete platform analytics</p>
         </div>
         <div className="flex gap-3 flex-wrap">
           <div className="flex items-center text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
             <Eye className="w-3 h-3 mr-1" />
             Updated: {lastUpdated.toLocaleTimeString()}
           </div>
-          <button onClick={toggleAutoRefresh} className={`px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${autoRefresh ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-            <span className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
-            {autoRefresh ? 'Auto ON' : 'Auto OFF'}
-          </button>
           <select value={period} onChange={(e) => setPeriod(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
             <option value="week">This Week</option>
             <option value="month">This Month</option>
@@ -449,7 +413,7 @@ function Dashboard() {
       </div>
 
       {/* Stats Grid - Row 2: Secondary Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-4 text-white">
           <p className="text-xs opacity-80">Cab Rides</p>
           <p className="text-2xl font-bold">{formatNumber(stats.totalCabRides)}</p>
@@ -465,11 +429,6 @@ function Dashboard() {
           <p className="text-2xl font-bold">{stats.completionRate || 0}%</p>
           <p className="text-xs opacity-80 mt-1">{formatNumber(stats.completedRides)} / {formatNumber(stats.totalRides)}</p>
         </div>
-        <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-4 text-white">
-          <p className="text-xs opacity-80">Platform Commission</p>
-          <p className="text-2xl font-bold">{formatCurrency(stats.platformCommission)}</p>
-          <p className="text-xs opacity-80 mt-1">Driver gets {stats.driverCommission || 80}%</p>
-        </div>
         <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-xl p-4 text-white">
           <p className="text-xs opacity-80">Cancelled Rides</p>
           <p className="text-2xl font-bold">{formatNumber(stats.cancelledRides)}</p>
@@ -482,7 +441,7 @@ function Dashboard() {
         {/* Revenue Trend Chart */}
         <div className="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
           <h3 className="text-base font-semibold text-gray-800 mb-4">Revenue Trend</h3>
-          {revenueData.length > 0 ? (
+          {revenueData && revenueData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={revenueData}>
                 <defs>
@@ -491,33 +450,45 @@ function Dashboard() {
                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
-                <YAxis stroke="#9ca3af" fontSize={12} tickFormatter={(value) => `₹${value/1000}K`} />
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis tickFormatter={(value) => `₹${(value/1000).toFixed(0)}K`} />
                 <Tooltip formatter={(value) => formatCurrency(value)} />
                 <Area type="monotone" dataKey="revenue" stroke="#3b82f6" fillOpacity={1} fill="url(#colorRevenue)" />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-72 text-gray-400">No data available</div>
+            <div className="flex items-center justify-center h-72 text-gray-400">
+              <div className="text-center">
+                <DollarSign className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                <p>No revenue data available</p>
+                <p className="text-xs mt-1">Complete some rides to see data</p>
+              </div>
+            </div>
           )}
         </div>
 
         {/* Rides Trend Chart */}
         <div className="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
           <h3 className="text-base font-semibold text-gray-800 mb-4">Rides Trend</h3>
-          {revenueData.length > 0 ? (
+          {revenueData && revenueData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={revenueData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} />
-                <YAxis stroke="#9ca3af" fontSize={12} />
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
                 <Tooltip />
                 <Bar dataKey="rides" fill="#10b981" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-72 text-gray-400">No data available</div>
+            <div className="flex items-center justify-center h-72 text-gray-400">
+              <div className="text-center">
+                <Car className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                <p>No rides data available</p>
+                <p className="text-xs mt-1">Complete some rides to see data</p>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -574,53 +545,6 @@ function Dashboard() {
           )}
         </div>
       )}
-
-      {/* Additional Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar className="w-4 h-4 text-purple-600" />
-            <p className="text-sm text-gray-500">Total Bookings</p>
-          </div>
-          <p className="text-xl font-bold text-gray-900">{formatNumber(stats.totalBookings)}</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-2 mb-2">
-            <CreditCard className="w-4 h-4 text-green-600" />
-            <p className="text-sm text-gray-500">Successful Payments</p>
-          </div>
-          <p className="text-xl font-bold text-green-600">{formatNumber(stats.totalPayments)}</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock className="w-4 h-4 text-yellow-600" />
-            <p className="text-sm text-gray-500">Pending Payments</p>
-          </div>
-          <p className="text-xl font-bold text-yellow-600">{formatNumber(stats.pendingPayments)}</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-2 mb-2">
-            <Activity className="w-4 h-4 text-blue-600" />
-            <p className="text-sm text-gray-500">Online Drivers</p>
-          </div>
-          <p className="text-xl font-bold text-blue-600">{formatNumber(stats.onlineDrivers)}</p>
-        </div>
-      </div>
-
-      {/* Auto-refresh status */}
-      <div className="text-center text-xs text-gray-400 bg-gray-50 py-2 rounded-lg">
-        {autoRefresh ? (
-          <span className="inline-flex items-center gap-2">
-            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-            Auto-refreshing every 15 seconds • Last updated: {lastUpdated.toLocaleTimeString()}
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-2">
-            <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
-            Auto-refresh OFF • Click Refresh button to update
-          </span>
-        )}
-      </div>
     </div>
   );
 }
